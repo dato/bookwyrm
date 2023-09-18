@@ -1,0 +1,9 @@
+This is the version of the code that runs on my personal BookWyrm
+instance, https://libros.rizoma1.ar.
+
+I keep open pull requests for the stuff I’m working on (though not
+all of them are meant for upstream.)
+
+Reported issues here are just reminders for small things I want to
+take care of, or ideas. In general, it’s stuff that doesn’t merit
+a bug report against the main repo.
