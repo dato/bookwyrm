@@ -136,6 +136,59 @@ class EditBookViews(TestCase):
             result.context_data["cover_url"], "http://local.host/cover.jpg"
         )
 
+    def test_partial_published_dates(self):
+        """create a book with a partial publication date, then update it"""
+        self.local_user.groups.add(self.group)
+        view = views.CreateBook.as_view()
+        form = forms.EditionForm()
+        form.data["title"] = "An Edition With Dates"
+        form.data["parent_work"] = self.work.id
+        form.data["last_edited_by"] = self.local_user.id
+        # published_date: 2023-01-01
+        form.data["published_date_day"] = "1"
+        form.data["published_date_month"] = "1"
+        form.data["published_date_year"] = "2023"
+        # first_published_date: 1995
+        form.data["first_published_date_day"] = "1"
+        form.data["first_published_date_month"] = "1"
+        form.data["first_published_date_year"] = "1995"
+        request = self.factory.post("", form.data)
+        request.user = self.local_user
+        request.user.is_superuser = True
+
+        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
+            result = view(request)
+
+        book = models.Edition.objects.get(title="An Edition With Dates")
+
+        self.assertEqual("2023-01-01", book.published_date.date().isoformat())
+        self.assertEqual("1995-01-01", book.first_published_date.date().isoformat())
+
+        # now edit publication dates
+        view = views.ConfirmEditBook.as_view()
+        form = forms.EditionForm(instance=book)
+        form.data["title"] = "An Edition With Dates" # XXX fails without this
+        form.data["parent_work"] = self.work.id
+        form.data["last_edited_by"] = self.local_user.id
+        # new published_date: full -> year-only
+        form.data["published_date_day"] = "1"
+        form.data["published_date_month"] = "1"
+        form.data["published_date_year"] = "2020"
+        # new first_published_date: add month
+        form.data["first_published_date_day"] = "1"
+        form.data["first_published_date_month"] = "3"
+        form.data["first_published_date_year"] = "1995"
+        request = self.factory.post("", form.data)
+        request.user = self.local_user
+
+        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
+            view(request, book.id)
+
+        book.refresh_from_db()
+
+        self.assertEqual("2020-01-01", book.published_date.date().isoformat())
+        self.assertEqual("1995-03-01", book.first_published_date.date().isoformat())
+
     @responses.activate
     def test_edit_book_add_author(self):
         """lets a user edit a book with new authors"""
