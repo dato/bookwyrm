@@ -3,6 +3,7 @@ import datetime
 from unittest.mock import patch
 from django.test import TestCase
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.utils import timezone
 
 from bookwyrm import models
@@ -45,6 +46,12 @@ class ReadThroughConstraints(ReadThroughTestBase):
         self._assert_create(None, start)
         self._assert_create(start, start + datetime.timedelta(days=1))
         self._assert_create(start, start)
+
+    def test_chronology_constraint(self):
+        """finish_date >= start_date"""
+        start = timezone.now()
+        with self.assertRaises(IntegrityError):
+            self._assert_create(start, start - datetime.timedelta(days=2))
 
 
 class ReadThroughProgressUpdates(ReadThroughTestBase):
