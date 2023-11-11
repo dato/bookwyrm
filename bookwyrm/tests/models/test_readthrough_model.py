@@ -8,8 +8,8 @@ from django.utils import timezone
 from bookwyrm import models
 
 
-class ReadThrough(TestCase):
-    """some activitypub oddness ahead"""
+class ReadThroughTestBase(TestCase):
+    """create user and book for ReadThrough tests"""
 
     def setUp(self):
         """look, a shelf"""
@@ -25,57 +25,30 @@ class ReadThrough(TestCase):
             title="Example Edition", parent_work=self.work
         )
 
-    def test_valid_date(self):
-        """can't finish a book before you start it"""
-        start = timezone.now()
-        finish = start + datetime.timedelta(days=1)
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-            finish_date=finish,
+
+class ReadThroughConstraints(ReadThroughTestBase):
+    def _assert_create(self, start_date=None, finish_date=None, /):
+        self.assertIsNotNone(
+            models.ReadThrough.objects.create(
+                user=self.user,
+                book=self.edition,
+                start_date=start_date,
+                finish_date=finish_date,
+            )
         )
 
-    def test_valid_date_null_start(self):
-        """can't finish a book before you start it"""
+    def test_valid_dates(self):
+        """valid combinations of start_date and finish_date"""
         start = timezone.now()
-        finish = start + datetime.timedelta(days=1)
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            finish_date=finish,
-        )
+        self._assert_create(None, None)
+        self._assert_create(start, None)
+        self._assert_create(None, start)
+        self._assert_create(start, start + datetime.timedelta(days=1))
+        self._assert_create(start, start)
 
-    def test_valid_date_null_finish(self):
-        """can't finish a book before you start it"""
-        start = timezone.now()
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-        )
 
-    def test_valid_date_null(self):
-        """can't finish a book before you start it"""
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-        )
-
-    def test_valid_date_same(self):
-        """can't finish a book before you start it"""
-        start = timezone.now()
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-            finish_date=start,
-        )
+class ReadThroughProgressUpdates(ReadThroughTestBase):
+    """test ProgressUpdate creation from ReadThrough objects"""
 
     def test_progress_update(self):
         """Test progress updates"""
