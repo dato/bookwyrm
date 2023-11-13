@@ -79,7 +79,7 @@ def reverse_read_status_step(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("bookwyrm", "0150_readthrough_stopped_date"),
+        ("bookwyrm", "0184_auto_20231106_0421"),
     ]
 
     operations = [
