@@ -1,9 +1,9 @@
 """ testing models """
-import datetime
+from datetime import timedelta
 from unittest.mock import patch
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from bookwyrm import models
@@ -28,30 +28,60 @@ class ReadThroughTestBase(TestCase):
 
 
 class ReadThroughConstraints(ReadThroughTestBase):
-    def _assert_create(self, start_date=None, finish_date=None, /):
+    def _assert_create(self, start_date, finish_date=None, /, read_status="read"):
+        """create ReadThrough helper"""
         self.assertIsNotNone(
             models.ReadThrough.objects.create(
                 user=self.user,
                 book=self.edition,
                 start_date=start_date,
                 finish_date=finish_date,
+                read_status=read_status,
             )
         )
+
+    def _fail_create(self, start_date, finish_date, /, read_status):
+        """expected failure in ReadThrough creation"""
+        with self.assertRaises(IntegrityError):
+            self._assert_create(start_date, finish_date, read_status)
 
     def test_valid_dates(self):
         """valid combinations of start_date and finish_date"""
         start = timezone.now()
+
         self._assert_create(None, None)
         self._assert_create(start, None)
         self._assert_create(None, start)
-        self._assert_create(start, start + datetime.timedelta(days=1))
+        self._assert_create(start, start + timedelta(days=1))
         self._assert_create(start, start)
+
+        self._assert_create(None, None, "to-read")
+        self._assert_create(None, None, "reading")
+        self._assert_create(start, None, "reading")
 
     def test_chronology_constraint(self):
         """finish_date >= start_date"""
         start = timezone.now()
-        with self.assertRaises(IntegrityError):
-            self._assert_create(start, start - datetime.timedelta(days=2))
+        before_start = start - timedelta(days=2)
+
+        self._fail_create(start, before_start, "read")
+
+    def test_currently_reading_constraint(self):
+        """no finish date allowed for `reading`"""
+        start = finish = timezone.now()
+        self._fail_create(start, finish, "reading")
+
+    def test_to_read_constraint(self):
+        """no dates allowed for `to-read`"""
+        start = finish = timezone.now()
+        test_cases = [
+            ("start date", start, None),
+            ("finish date", None, start),
+            ("start and finish", start, finish),
+        ]
+        for desc, beg, end in test_cases:
+            with self.subTest(desc), transaction.atomic():
+                self._fail_create(beg, end, "to-read")
 
 
 class ReadThroughProgressUpdates(ReadThroughTestBase):
