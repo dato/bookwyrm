@@ -26,7 +26,7 @@ def unmerge_finish_stopped_dates(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("bookwyrm", "0151_auto_20220703_1842"),
+        ("bookwyrm", "0152_readthrough_read_status_add"),
     ]
 
     operations = [

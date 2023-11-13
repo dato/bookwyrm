@@ -70,11 +70,16 @@ class ReadThrough(BookWyrmModel):
             ),
             # Can't be actively reading the same book twice
             # Currently reading status can't have stopped date
-            # models.CheckConstraint(
-            #    check=~Q(read_status="to-read", finish_date__isnull=False),
-            #    name="currently-reading"
-            # ),
+            models.CheckConstraint(
+                name="currently-reading",
+                check=~Q(read_status="reading", finish_date__isnull=False),
+            ),
             # Can't want to read and have started or finished dates
+            models.CheckConstraint(
+                name="to-read",
+                check=~Q(read_status="to-read")
+                | Q(start_date__isnull=True, finish_date__isnull=True),
+            ),
         ]
         ordering = ("-start_date",)
 
