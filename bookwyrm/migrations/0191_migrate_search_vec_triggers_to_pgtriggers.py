@@ -12,12 +12,17 @@ trigger_migration = import_module("bookwyrm.migrations.0077_auto_20210623_2155")
 # it's _very_ convenient for development that this migration be reversible
 search_vector_trigger = trigger_migration.Migration.operations[4]
 author_search_vector_trigger = trigger_migration.Migration.operations[5]
+book_authors_search_vector_trigger = trigger_migration.Migration.operations[6]
 
 
 assert re.search(r"\bCREATE TRIGGER search_vector_trigger\b", search_vector_trigger.sql)
 assert re.search(
     r"\bCREATE TRIGGER author_search_vector_trigger\b",
     author_search_vector_trigger.sql,
+)
+assert re.search(
+    r"\bCREATE TRIGGER book_authors_search_vector_trigger\b",
+    book_authors_search_vector_trigger.sql,
 )
 
 
@@ -66,5 +71,12 @@ class Migration(migrations.Migration):
                    DROP FUNCTION IF EXISTS author_trigger;
             """,
             reverse_sql=author_search_vector_trigger.sql,
+        ),
+        migrations.RunSQL(
+            # XXX not migrated yet
+            sql="""DROP TRIGGER IF EXISTS book_authors_search_vector_trigger ON bookwyrm_book_authors;
+                   DROP FUNCTION IF EXISTS book_authors_trigger;
+            """,
+            reverse_sql=book_authors_search_vector_trigger.sql,
         ),
     ]
