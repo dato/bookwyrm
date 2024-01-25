@@ -27,12 +27,14 @@ from .group import Group, GroupMember, GroupMemberInvitation
 
 from .import_job import ImportJob, ImportItem
 
+from .move import MoveUser
+
 from .site import SiteSettings, Theme, SiteInvite
 from .site import PasswordReset, InviteRequest
 from .announcement import Announcement
 from .antispam import EmailBlocklist, IPBlocklist, AutoMod, automod_task
 
-from .notification import Notification
+from .notification import Notification, NotificationType
 
 from .hashtag import Hashtag
 
