@@ -1,15 +1,16 @@
 """ testing models """
-import datetime
+from datetime import timedelta
 from unittest.mock import patch
 from django.test import TestCase
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from bookwyrm import models
 
 
-class ReadThrough(TestCase):
-    """some activitypub oddness ahead"""
+class ReadThroughTestBase(TestCase):
+    """create user and book for ReadThrough tests"""
 
     @classmethod
     def setUpTestData(self):  # pylint: disable=bad-classmethod-argument
@@ -26,57 +27,66 @@ class ReadThrough(TestCase):
             title="Example Edition", parent_work=self.work
         )
 
-    def test_valid_date(self):
-        """can't finish a book before you start it"""
-        start = timezone.now()
-        finish = start + datetime.timedelta(days=1)
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-            finish_date=finish,
+
+class ReadThroughConstraints(ReadThroughTestBase):
+    def _assert_create(self, start_date, finish_date=None, /, read_status="read"):
+        """create ReadThrough helper"""
+        self.assertIsNotNone(
+            models.ReadThrough.objects.create(
+                user=self.user,
+                book=self.edition,
+                start_date=start_date,
+                finish_date=finish_date,
+                read_status=read_status,
+            )
         )
 
-    def test_valid_date_null_start(self):
-        """can't finish a book before you start it"""
-        start = timezone.now()
-        finish = start + datetime.timedelta(days=1)
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            finish_date=finish,
-        )
+    def _fail_create(self, start_date, finish_date, /, read_status):
+        """expected failure in ReadThrough creation"""
+        with self.assertRaises(IntegrityError):
+            self._assert_create(start_date, finish_date, read_status)
 
-    def test_valid_date_null_finish(self):
-        """can't finish a book before you start it"""
+    def test_valid_dates(self):
+        """valid combinations of start_date and finish_date"""
         start = timezone.now()
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-        )
 
-    def test_valid_date_null(self):
-        """can't finish a book before you start it"""
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-        )
+        self._assert_create(None, None)
+        self._assert_create(start, None)
+        self._assert_create(None, start)
+        self._assert_create(start, start + timedelta(days=1))
+        self._assert_create(start, start)
 
-    def test_valid_date_same(self):
-        """can't finish a book before you start it"""
+        self._assert_create(None, None, "to-read")
+        self._assert_create(None, None, "reading")
+        self._assert_create(start, None, "reading")
+
+    def test_chronology_constraint(self):
+        """finish_date >= start_date"""
         start = timezone.now()
-        # just make sure there's no errors
-        models.ReadThrough.objects.create(
-            user=self.user,
-            book=self.edition,
-            start_date=start,
-            finish_date=start,
-        )
+        before_start = start - timedelta(days=2)
+
+        self._fail_create(start, before_start, "read")
+
+    def test_currently_reading_constraint(self):
+        """no finish date allowed for `reading`"""
+        start = finish = timezone.now()
+        self._fail_create(start, finish, "reading")
+
+    def test_to_read_constraint(self):
+        """no dates allowed for `to-read`"""
+        start = finish = timezone.now()
+        test_cases = [
+            ("start date", start, None),
+            ("finish date", None, start),
+            ("start and finish", start, finish),
+        ]
+        for desc, beg, end in test_cases:
+            with self.subTest(desc), transaction.atomic():
+                self._fail_create(beg, end, "to-read")
+
+
+class ReadThroughProgressUpdates(ReadThroughTestBase):
+    """test ProgressUpdate creation from ReadThrough objects"""
 
     def test_progress_update(self):
         """Test progress updates"""
