@@ -18,18 +18,14 @@ class LinkViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         group = Group.objects.create(name="editor")
         group.permissions.add(
             Permission.objects.create(
@@ -127,14 +123,13 @@ class LinkViews(TestCase):
 
         request = self.factory.post("", data=data)
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            result = view(request, self.book.id)
-            # link is duplicate and we get form page again with error
-            self.assertContains(
-                result,
-                "This link with file type has already been added for this book",
-            )
-            self.assertEqual(result.status_code, 200)
+        result = view(request, self.book.id)
+        # link is duplicate and we get form page again with error
+        self.assertContains(
+            result,
+            "This link with file type has already been added for this book",
+        )
+        self.assertEqual(result.status_code, 200)
 
     def test_book_links(self):
         """there are so many views, this just makes sure it LOADS"""

@@ -22,19 +22,14 @@ class EditBookViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         cls.group = Group.objects.create(name="editor")
         cls.group.permissions.add(
             Permission.objects.create(
@@ -112,8 +107,7 @@ class EditBookViews(TestCase):
         request = self.factory.post("", form.data)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            view(request, self.book.id)
+        view(request, self.book.id)
 
         self.book.refresh_from_db()
         self.assertEqual(self.book.title, "New Title")
@@ -171,8 +165,7 @@ class EditBookViews(TestCase):
         request = self.factory.post("", form.data)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            view(request, self.book.id)
+        view(request, self.book.id)
 
         self.book.refresh_from_db()
         self.assertEqual(self.book.title, "New Title")
@@ -192,8 +185,8 @@ class EditBookViews(TestCase):
         request = self.factory.post("", form.data)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            view(request, self.book.id)
+        view(request, self.book.id)
+
         self.book.refresh_from_db()
         self.assertEqual(self.book.title, "New Title")
         self.assertFalse(self.book.authors.exists())
@@ -269,9 +262,7 @@ class EditBookViews(TestCase):
         request = self.factory.post("", book_data | initial_pub_dates)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            create_book(request)
-
+        create_book(request)
         book = models.Edition.objects.get(title="An Edition With Dates")
 
         self.assertEqual("2023-01-01", book.published_date.partial_isoformat())
@@ -288,9 +279,7 @@ class EditBookViews(TestCase):
         request = self.factory.post("", book_data | updated_pub_dates)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            result = edit_book(request, book.id)
-
+        result = edit_book(request, book.id)
         self.assertEqual(result.status_code, 302)
 
         book.refresh_from_db()
@@ -406,8 +395,7 @@ class EditBookViews(TestCase):
         request.user = self.local_user
         request.user.is_superuser = True
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            result = view(request)
+        result = view(request)
         self.assertEqual(result.status_code, 302)
 
         new_edition = models.Edition.objects.get(title="A Title")

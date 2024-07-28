@@ -24,19 +24,14 @@ class BookViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         cls.group = Group.objects.create(name="editor")
         cls.group.permissions.add(
             Permission.objects.create(
@@ -82,9 +77,7 @@ class BookViews(TestCase):
         self.assertIsInstance(result, ActivitypubResponse)
         self.assertEqual(result.status_code, 200)
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_book_page_statuses(self, *_):
+    def test_book_page_statuses(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Book.as_view()
 
@@ -206,8 +199,7 @@ class BookViews(TestCase):
         request = self.factory.post("", {"description": "new description hi"})
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.add_description(request, self.book.id)
+        views.add_description(request, self.book.id)
 
         self.book.refresh_from_db()
         self.assertEqual(self.book.description, "new description hi")
@@ -261,9 +253,7 @@ class BookViews(TestCase):
         self.assertEqual(mock.call_args[0][0], "https://openlibrary.org/book/123")
         self.assertEqual(result.status_code, 302)
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_quotation_endposition(self, *_):
+    def test_quotation_endposition(self):
         """make sure the endposition is served as well"""
         view = views.Book.as_view()
 
