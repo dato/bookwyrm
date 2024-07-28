@@ -1,6 +1,4 @@
 """ tests for hashtag view """
-from unittest.mock import patch
-
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
 from django.template.response import TemplateResponse
@@ -16,37 +14,31 @@ class HashtagView(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
-            cls.follower_user = models.User.objects.create_user(
-                "follower@local.com",
-                "follower@email.com",
-                "followerword",
-                local=True,
-                localname="follower",
-                remote_id="https://example.com/users/follower",
-            )
-            cls.local_user.followers.add(cls.follower_user)
-            cls.other_user = models.User.objects.create_user(
-                "other@local.com",
-                "other@email.com",
-                "otherword",
-                local=True,
-                localname="other",
-                remote_id="https://example.com/users/other",
-            )
-
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
+        cls.follower_user = models.User.objects.create_user(
+            "follower@local.com",
+            "follower@email.com",
+            "followerword",
+            local=True,
+            localname="follower",
+            remote_id="https://example.com/users/follower",
+        )
+        cls.local_user.followers.add(cls.follower_user)
+        cls.other_user = models.User.objects.create_user(
+            "other@local.com",
+            "other@email.com",
+            "otherword",
+            local=True,
+            localname="other",
+            remote_id="https://example.com/users/other",
+        )
         cls.work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Example Edition",
@@ -55,15 +47,11 @@ class HashtagView(TestCase):
         )
 
         cls.hashtag_bookclub = models.Hashtag.objects.create(name="#BookClub")
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_status_task.delay"),
-        ):
-            cls.statuses_bookclub = [
-                models.Comment.objects.create(
-                    book=cls.book, user=cls.local_user, content="#BookClub"
-                ),
-            ]
+        cls.statuses_bookclub = [
+            models.Comment.objects.create(
+                book=cls.book, user=cls.local_user, content="#BookClub"
+            ),
+        ]
         for status in cls.statuses_bookclub:
             status.mention_hashtags.add(cls.hashtag_bookclub)
 
@@ -94,14 +82,10 @@ class HashtagView(TestCase):
         request = self.factory.get("")
 
         hashtag = models.Hashtag.objects.create(name="#test")
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_status_task.delay"),
-        ):
-            status = models.Comment.objects.create(
-                user=self.local_user, book=self.book, content="#test", privacy="direct"
-            )
-            status.mention_hashtags.add(hashtag)
+        status = models.Comment.objects.create(
+            user=self.local_user, book=self.book, content="#test", privacy="direct"
+        )
+        status.mention_hashtags.add(hashtag)
 
         for user in [
             self.local_user,
@@ -119,17 +103,13 @@ class HashtagView(TestCase):
         request = self.factory.get("")
 
         hashtag = models.Hashtag.objects.create(name="#test")
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_status_task.delay"),
-        ):
-            status = models.Comment.objects.create(
-                user=self.local_user,
-                book=self.book,
-                content="#test",
-                privacy="unlisted",
-            )
-            status.mention_hashtags.add(hashtag)
+        status = models.Comment.objects.create(
+            user=self.local_user,
+            book=self.book,
+            content="#test",
+            privacy="unlisted",
+        )
+        status.mention_hashtags.add(hashtag)
 
         for user in [
             self.local_user,
@@ -148,17 +128,13 @@ class HashtagView(TestCase):
         request = self.factory.get("")
 
         hashtag = models.Hashtag.objects.create(name="#test")
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_status_task.delay"),
-        ):
-            status = models.Comment.objects.create(
-                user=self.local_user,
-                book=self.book,
-                content="#test",
-                privacy="followers",
-            )
-            status.mention_hashtags.add(hashtag)
+        status = models.Comment.objects.create(
+            user=self.local_user,
+            book=self.book,
+            content="#test",
+            privacy="followers",
+        )
+        status.mention_hashtags.add(hashtag)
 
         for user in [self.local_user, self.follower_user]:
             request.user = user
