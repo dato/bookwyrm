@@ -25,21 +25,16 @@ class UserViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.rat = models.User.objects.create_user(
-                "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.rat = models.User.objects.create_user(
+            "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
+        )
         cls.book = models.Edition.objects.create(
             title="test", parent_work=models.Work.objects.create(title="test work")
         )
@@ -47,24 +42,18 @@ class UserViews(TestCase):
             title="recently shelved",
             parent_work=models.Work.objects.create(title="recent shelved"),
         )
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.add_book_statuses_task.delay"),
-        ):
-            models.ShelfBook.objects.create(
-                book=cls.book,
-                user=cls.local_user,
-                shelf=cls.local_user.shelf_set.first(),
-                shelved_date=make_date(2020, 10, 21),
-            )
-
-            models.ShelfBook.objects.create(
-                book=cls.book_recently_shelved,
-                user=cls.local_user,
-                shelf=cls.local_user.shelf_set.first(),
-                shelved_date=make_date(2024, 7, 1),
-            )
+        models.ShelfBook.objects.create(
+            book=cls.book,
+            user=cls.local_user,
+            shelf=cls.local_user.shelf_set.first(),
+            shelved_date=make_date(2020, 10, 21),
+        )
+        models.ShelfBook.objects.create(
+            book=cls.book_recently_shelved,
+            user=cls.local_user,
+            shelf=cls.local_user.shelf_set.first(),
+            shelved_date=make_date(2024, 7, 1),
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
@@ -106,17 +95,15 @@ class UserViews(TestCase):
 
     def test_user_page_domain(self):
         """when the user domain has dashes in it"""
-        with patch("bookwyrm.models.user.set_remote_server"):
-            models.User.objects.create_user(
-                "nutria",
-                "",
-                "nutriaword",
-                local=False,
-                remote_id="https://ex--ample.co----m/users/nutria",
-                inbox="https://ex--ample.co----m/users/nutria/inbox",
-                outbox="https://ex--ample.co----m/users/nutria/outbox",
-            )
-
+        models.User.objects.create_user(
+            "nutria",
+            "",
+            "nutriaword",
+            local=False,
+            remote_id="https://ex--ample.co----m/users/nutria",
+            inbox="https://ex--ample.co----m/users/nutria/inbox",
+            outbox="https://ex--ample.co----m/users/nutria/outbox",
+        )
         view = views.User.as_view()
         request = self.factory.get("")
         request.user = self.local_user
@@ -195,17 +182,15 @@ class UserViews(TestCase):
 
     def test_user_page_remote_anonymous(self):
         """when a anonymous user tries to get a remote user"""
-        with patch("bookwyrm.models.user.set_remote_server"):
-            models.User.objects.create_user(
-                "nutria",
-                "",
-                "nutriaword",
-                local=False,
-                remote_id="https://example.com/users/nutria",
-                inbox="https://example.com/users/nutria/inbox",
-                outbox="https://example.com/users/nutria/outbox",
-            )
-
+        models.User.objects.create_user(
+            "nutria",
+            "",
+            "nutriaword",
+            local=False,
+            remote_id="https://example.com/users/nutria",
+            inbox="https://example.com/users/nutria/inbox",
+            outbox="https://example.com/users/nutria/outbox",
+        )
         view = views.User.as_view()
         request = self.factory.get("")
         request.user = self.anonymous_user
@@ -217,9 +202,7 @@ class UserViews(TestCase):
             result, "https://example.com/users/nutria", fetch_redirect_response=False
         )
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    def test_followers_page_blocked(self, *_):
+    def test_followers_page_blocked(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Relationships.as_view()
         request = self.factory.get("")

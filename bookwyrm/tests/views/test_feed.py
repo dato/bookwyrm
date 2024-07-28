@@ -12,37 +12,26 @@ from bookwyrm.activitypub import ActivitypubResponse
 from bookwyrm.tests.validate_html import validate_html
 
 
-@patch("bookwyrm.activitystreams.ActivityStream.get_activity_stream")
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.lists_stream.populate_lists_task.delay")
-@patch("bookwyrm.suggested_users.remove_user_task.delay")
 class FeedViews(TestCase):
     """activity feed, statuses, dms"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.another_user = models.User.objects.create_user(
-                "nutria@local.com",
-                "nutria@nutria.nutria",
-                "password",
-                local=True,
-                localname="nutria",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.another_user = models.User.objects.create_user(
+            "nutria@local.com",
+            "nutria@nutria.nutria",
+            "password",
+            local=True,
+            localname="nutria",
+        )
         cls.book = models.Edition.objects.create(
             parent_work=models.Work.objects.create(title="hi"),
             title="Example Edition",
@@ -55,6 +44,7 @@ class FeedViews(TestCase):
         self.factory = RequestFactory()
 
     @patch("bookwyrm.suggested_users.SuggestedUsers.get_suggestions")
+    @patch("bookwyrm.activitystreams.ActivityStream.get_activity_stream")
     def test_feed(self, *_):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Feed.as_view()
@@ -66,6 +56,7 @@ class FeedViews(TestCase):
         self.assertEqual(result.status_code, 200)
 
     @patch("bookwyrm.suggested_users.SuggestedUsers.get_suggestions")
+    @patch("bookwyrm.activitystreams.ActivityStream.get_activity_stream")
     def test_save_feed_settings(self, *_):
         """update display preferences"""
         self.assertEqual(
@@ -84,11 +75,10 @@ class FeedViews(TestCase):
         self.local_user.refresh_from_db()
         self.assertEqual(self.local_user.feed_status_types, ["review"])
 
-    def test_status_page(self, *_):
+    def test_status_page(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Status.as_view()
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            status = models.Status.objects.create(content="hi", user=self.local_user)
+        status = models.Status.objects.create(content="hi", user=self.local_user)
         request = self.factory.get("")
         request.user = self.local_user
         with patch("bookwyrm.views.feed.is_api_request") as is_api:
@@ -104,7 +94,7 @@ class FeedViews(TestCase):
         self.assertIsInstance(result, ActivitypubResponse)
         self.assertEqual(result.status_code, 200)
 
-    def test_status_page_not_found(self, *_):
+    def test_status_page_not_found(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Status.as_view()
 
@@ -115,7 +105,7 @@ class FeedViews(TestCase):
             with self.assertRaises(Http404):
                 view(request, "mouse", 12345)
 
-    def test_status_page_not_found_wrong_user(self, *_):
+    def test_status_page_not_found_wrong_user(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Status.as_view()
         another_user = models.User.objects.create_user(
@@ -125,8 +115,7 @@ class FeedViews(TestCase):
             local=True,
             localname="rat",
         )
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            status = models.Status.objects.create(content="hi", user=another_user)
+        status = models.Status.objects.create(content="hi", user=another_user)
 
         request = self.factory.get("")
         request.user = self.local_user
@@ -135,24 +124,21 @@ class FeedViews(TestCase):
             with self.assertRaises(Http404):
                 view(request, "mouse", status.id)
 
-    def test_status_page_with_image(self, *_):
+    def test_status_page_with_image(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Status.as_view()
 
         image_path = pathlib.Path(__file__).parent.joinpath(
             "../../static/images/default_avi.jpg"
         )
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            status = models.Review.objects.create(
-                content="hi",
-                user=self.local_user,
-                book=self.book,
-            )
-            attachment = models.Image.objects.create(
-                status=status, caption="alt text here"
-            )
-            with open(image_path, "rb") as image_file:
-                attachment.image.save("test.jpg", image_file)
+        status = models.Review.objects.create(
+            content="hi",
+            user=self.local_user,
+            book=self.book,
+        )
+        attachment = models.Image.objects.create(status=status, caption="alt text here")
+        with open(image_path, "rb") as image_file:
+            attachment.image.save("test.jpg", image_file)
 
         request = self.factory.get("")
         request.user = self.local_user
@@ -169,11 +155,10 @@ class FeedViews(TestCase):
         self.assertIsInstance(result, ActivitypubResponse)
         self.assertEqual(result.status_code, 200)
 
-    def test_replies_page(self, *_):
+    def test_replies_page(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Replies.as_view()
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            status = models.Status.objects.create(content="hi", user=self.local_user)
+        status = models.Status.objects.create(content="hi", user=self.local_user)
         request = self.factory.get("")
         request.user = self.local_user
         with patch("bookwyrm.views.feed.is_api_request") as is_api:
@@ -189,7 +174,7 @@ class FeedViews(TestCase):
         self.assertIsInstance(result, ActivitypubResponse)
         self.assertEqual(result.status_code, 200)
 
-    def test_direct_messages_page(self, *_):
+    def test_direct_messages_page(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.DirectMessage.as_view()
         request = self.factory.get("")
@@ -199,7 +184,7 @@ class FeedViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    def test_direct_messages_page_user(self, *_):
+    def test_direct_messages_page_user(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.DirectMessage.as_view()
         request = self.factory.get("")
@@ -210,9 +195,7 @@ class FeedViews(TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.context_data["partner"], self.another_user)
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
-    def test_get_suggested_book(self, *_):
+    def test_get_suggested_book(self):
         """gets books the ~*~ algorithm ~*~ thinks you want to post about"""
         models.ShelfBook.objects.create(
             book=self.book,

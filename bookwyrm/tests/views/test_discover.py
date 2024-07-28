@@ -14,18 +14,13 @@ class DiscoverViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
@@ -47,9 +42,7 @@ class DiscoverViews(TestCase):
         self.assertEqual(result.status_code, 200)
         validate_html(result.render())
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_discover_page_with_posts(self, *_):
+    def test_discover_page_with_posts(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Discover.as_view()
         request = self.factory.get("")
