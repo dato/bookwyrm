@@ -14,31 +14,24 @@ class TransactionInboxCreate(TransactionTestCase):
 
     def setUp(self):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            self.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        self.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         self.local_user.remote_id = "https://example.com/user/mouse"
         self.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            self.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
-
+        self.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         self.create_json = {
             "id": "hi",
             "type": "Create",
@@ -49,7 +42,7 @@ class TransactionInboxCreate(TransactionTestCase):
         }
         models.SiteSettings.objects.create()
 
-    def test_create_status_transaction(self, *_):
+    def test_create_status_transaction(self):
         """the "it justs works" mode"""
         datafile = pathlib.Path(__file__).parent.joinpath(
             "../../data/ap_quotation.json"
@@ -67,38 +60,30 @@ class TransactionInboxCreate(TransactionTestCase):
         self.assertEqual(mock.call_count, 0)
 
 
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
 class InboxCreate(TestCase):
     """readthrough tests"""
 
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         cls.local_user.remote_id = "https://example.com/user/mouse"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
 
         models.SiteSettings.objects.create()
 
@@ -113,7 +98,7 @@ class InboxCreate(TestCase):
             "object": {},
         }
 
-    def test_create_status(self, *_):
+    def test_create_status(self):
         """the "it justs works" mode"""
         datafile = pathlib.Path(__file__).parent.joinpath(
             "../../data/ap_quotation.json"
@@ -141,7 +126,7 @@ class InboxCreate(TestCase):
         views.inbox.activity_task(activity)
         self.assertEqual(models.Status.objects.count(), 1)
 
-    def test_create_comment_with_reading_status(self, *_):
+    def test_create_comment_with_reading_status(self):
         """the "it justs works" mode"""
         datafile = pathlib.Path(__file__).parent.joinpath("../../data/ap_comment.json")
         status_data = json.loads(datafile.read_bytes())
@@ -165,7 +150,7 @@ class InboxCreate(TestCase):
         views.inbox.activity_task(activity)
         self.assertEqual(models.Status.objects.count(), 1)
 
-    def test_create_status_remote_note_with_mention(self, *_):
+    def test_create_status_remote_note_with_mention(self):
         """should only create it under the right circumstances"""
         self.assertFalse(
             models.Notification.objects.filter(user=self.local_user).exists()
@@ -186,7 +171,7 @@ class InboxCreate(TestCase):
         )
         self.assertEqual(models.Notification.objects.get().notification_type, "MENTION")
 
-    def test_create_status_remote_note_with_reply(self, *_):
+    def test_create_status_remote_note_with_reply(self):
         """should only create it under the right circumstances"""
         parent_status = models.Status.objects.create(
             user=self.local_user,
@@ -212,7 +197,7 @@ class InboxCreate(TestCase):
         self.assertTrue(models.Notification.objects.filter(user=self.local_user))
         self.assertEqual(models.Notification.objects.get().notification_type, "REPLY")
 
-    def test_create_rating(self, *_):
+    def test_create_rating(self):
         """a remote rating activity"""
         book = models.Edition.objects.create(
             title="Test Book", remote_id="https://example.com/book/1"
@@ -247,7 +232,7 @@ class InboxCreate(TestCase):
         self.assertEqual(rating.book, book)
         self.assertEqual(rating.rating, 3.0)
 
-    def test_create_list(self, *_):
+    def test_create_list(self):
         """a new list"""
         activity = self.create_json
         activity["object"] = {
@@ -271,7 +256,7 @@ class InboxCreate(TestCase):
         self.assertEqual(book_list.description, "summary text")
         self.assertEqual(book_list.remote_id, "https://example.com/list/22")
 
-    def test_create_unsupported_type_question(self, *_):
+    def test_create_unsupported_type_question(self):
         """ignore activities we know we can't handle"""
         activity = self.create_json
         activity["object"] = {
@@ -281,7 +266,7 @@ class InboxCreate(TestCase):
         # just observe how it doesn't throw an error
         views.inbox.activity_task(activity)
 
-    def test_create_unsupported_type_article(self, *_):
+    def test_create_unsupported_type_article(self):
         """special case in unsupported type because we do know what it is"""
         activity = self.create_json
         activity["object"] = {
@@ -298,7 +283,7 @@ class InboxCreate(TestCase):
         # just observe how it doesn't throw an error
         views.inbox.activity_task(activity)
 
-    def test_create_unsupported_type_unknown(self, *_):
+    def test_create_unsupported_type_unknown(self):
         """Something truly unexpected should throw an error"""
         activity = self.create_json
         activity["object"] = {
@@ -309,7 +294,7 @@ class InboxCreate(TestCase):
         with self.assertRaises(ActivitySerializerError):
             views.inbox.activity_task(activity)
 
-    def test_create_unknown_type(self, *_):
+    def test_create_unknown_type(self):
         """ignore activities we know we've never heard of"""
         activity = self.create_json
         activity["object"] = {

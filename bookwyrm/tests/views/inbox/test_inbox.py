@@ -30,30 +30,24 @@ class Inbox(TestCase):
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         local_user.remote_id = "https://example.com/user/mouse"
         local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         models.SiteSettings.objects.create()
 
     def test_inbox_invalid_get(self):
@@ -122,11 +116,9 @@ class Inbox(TestCase):
         }
         with patch("bookwyrm.views.inbox.has_valid_signature") as mock_valid:
             mock_valid.return_value = True
-
-            with patch("bookwyrm.views.inbox.activity_task.apply_async"):
-                result = self.client.post(
-                    "/inbox", json.dumps(activity), content_type="application/json"
-                )
+            result = self.client.post(
+                "/inbox", json.dumps(activity), content_type="application/json"
+            )
         self.assertEqual(result.status_code, 200)
 
     def test_is_blocked_user_agent(self):
@@ -157,8 +149,7 @@ class Inbox(TestCase):
         with self.assertRaises(PermissionDenied):
             views.inbox.raise_is_blocked_activity(activity)
 
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_create_by_deactivated_user(self, _):
+    def test_create_by_deactivated_user(self):
         """don't let deactivated users post"""
         self.remote_user.delete(broadcast=False)
         self.assertTrue(self.remote_user.deleted)

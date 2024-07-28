@@ -14,30 +14,24 @@ class InboxUpdate(TestCase):
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         cls.local_user.remote_id = "https://example.com/user/mouse"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
 
         models.SiteSettings.objects.create()
 
@@ -54,13 +48,9 @@ class InboxUpdate(TestCase):
 
     def test_update_list(self):
         """a new list"""
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-        ):
-            book_list = models.List.objects.create(
-                name="hi", remote_id="https://example.com/list/22", user=self.local_user
-            )
+        book_list = models.List.objects.create(
+            name="hi", remote_id="https://example.com/list/22", user=self.local_user
+        )
         activity = self.update_json
         activity["object"] = {
             "id": "https://example.com/list/22",
@@ -76,18 +66,14 @@ class InboxUpdate(TestCase):
             "curation": "curated",
             "@context": "https://www.w3.org/ns/activitystreams",
         }
-        with patch("bookwyrm.lists_stream.remove_list_task.delay"):
-            views.inbox.activity_task(activity)
+        views.inbox.activity_task(activity)
         book_list.refresh_from_db()
         self.assertEqual(book_list.name, "Test List")
         self.assertEqual(book_list.curation, "curated")
         self.assertEqual(book_list.description, "summary text")
         self.assertEqual(book_list.remote_id, "https://example.com/list/22")
 
-    @patch("bookwyrm.suggested_users.rerank_user_task.delay")
-    @patch("bookwyrm.activitystreams.add_user_statuses_task.delay")
-    @patch("bookwyrm.lists_stream.add_user_lists_task.delay")
-    def test_update_user(self, *_):
+    def test_update_user(self):
         """update an existing user"""
         models.UserFollows.objects.create(
             user_subject=self.local_user,
@@ -140,17 +126,16 @@ class InboxUpdate(TestCase):
         del bookdata["authors"]
         self.assertEqual(book.title, "Test Book")
 
-        with patch("bookwyrm.activitypub.base_activity.set_related_field.delay"):
-            views.inbox.activity_task(
-                {
-                    "type": "Update",
-                    "to": [],
-                    "cc": [],
-                    "actor": "hi",
-                    "id": "sdkjf",
-                    "object": bookdata,
-                }
-            )
+        views.inbox.activity_task(
+            {
+                "type": "Update",
+                "to": [],
+                "cc": [],
+                "actor": "hi",
+                "id": "sdkjf",
+                "object": bookdata,
+            }
+        )
         book = models.Edition.objects.get(id=book.id)
         self.assertEqual(book.title, "Piranesi")
         self.assertEqual(book.last_edited_by, self.remote_user)
@@ -207,23 +192,20 @@ class InboxUpdate(TestCase):
 
         del bookdata["authors"]
         self.assertEqual(book.title, "Test Book")
-        with patch("bookwyrm.activitypub.base_activity.set_related_field.delay"):
-            views.inbox.activity_task(
-                {
-                    "type": "Update",
-                    "to": [],
-                    "cc": [],
-                    "actor": "hi",
-                    "id": "sdkjf",
-                    "object": bookdata,
-                }
-            )
+        views.inbox.activity_task(
+            {
+                "type": "Update",
+                "to": [],
+                "cc": [],
+                "actor": "hi",
+                "id": "sdkjf",
+                "object": bookdata,
+            }
+        )
         book = models.Work.objects.get(id=book.id)
         self.assertEqual(book.title, "Piranesi")
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_update_status(self, *_):
+    def test_update_status(self):
         """edit a status"""
         status = models.Status.objects.create(user=self.remote_user, content="hi")
 
@@ -235,8 +217,7 @@ class InboxUpdate(TestCase):
         activity = self.update_json
         activity["object"] = status_data
 
-        with patch("bookwyrm.activitypub.base_activity.set_related_field.delay"):
-            views.inbox.activity_task(activity)
+        views.inbox.activity_task(activity)
 
         status.refresh_from_db()
         self.assertEqual(status.content, "test content in note")
