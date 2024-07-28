@@ -20,18 +20,13 @@ class ImportViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
 
     def setUp(self):
         """individual test setup"""
@@ -92,8 +87,7 @@ class ImportViews(TestCase):
         request = self.factory.post("", form.data)
         request.user = self.local_user
 
-        with patch("bookwyrm.models.import_job.ImportJob.start_job"):
-            view(request)
+        view(request)
         job = models.ImportJob.objects.get()
         self.assertFalse(job.include_reviews)
         self.assertEqual(job.privacy, "public")

@@ -1,7 +1,5 @@
 """test for app action functionality"""
 
-from unittest.mock import patch
-
 from django.contrib.auth.models import Group
 from django.template.response import TemplateResponse
 from django.test import TestCase
@@ -23,39 +21,34 @@ class UserAdminViews(TestCase):
         initdb.init_permissions()
         moderator = Group.objects.get(name="moderator")
         editor = Group.objects.get(name="editor")
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.user_user = models.User.objects.create_user(
-                "user@local.com",
-                "user@user.user",
-                "password",
-                local=True,
-                localname="user",
-            )
-            cls.user_editor = models.User.objects.create_user(
-                "editor@local.com",
-                "editor@editor.editor",
-                "password",
-                local=True,
-                localname="editor",
-            )
-            cls.user_editor_2 = models.User.objects.create_user(
-                "editor_2@local.com",
-                "editor_2@editor_2.editor_2",
-                "password",
-                local=True,
-                localname="editor_2",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.user_user = models.User.objects.create_user(
+            "user@local.com",
+            "user@user.user",
+            "password",
+            local=True,
+            localname="user",
+        )
+        cls.user_editor = models.User.objects.create_user(
+            "editor@local.com",
+            "editor@editor.editor",
+            "password",
+            local=True,
+            localname="editor",
+        )
+        cls.user_editor_2 = models.User.objects.create_user(
+            "editor_2@local.com",
+            "editor_2@editor_2.editor_2",
+            "password",
+            local=True,
+            localname="editor_2",
+        )
         cls.local_user.groups.set([moderator])
         cls.user_editor.groups.set([editor])
         cls.user_editor_2.groups.set([editor])
@@ -87,10 +80,7 @@ class UserAdminViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_user_admin_page_post(self, *_):
+    def test_user_admin_page_post(self):
         """set the user's group"""
         group = Group.objects.get(name="editor")
         self.assertEqual(
@@ -101,8 +91,7 @@ class UserAdminViews(TestCase):
         request = self.factory.post("", {"groups": [group.id]})
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            result = view(request, self.local_user.id)
+        result = view(request, self.local_user.id)
 
         self.assertIsInstance(result, TemplateResponse)
         validate_html(result.render())
@@ -111,10 +100,7 @@ class UserAdminViews(TestCase):
             list(self.local_user.groups.values_list("name", flat=True)), ["editor"]
         )
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_user_admin_page_post_with_report(self, *_):
+    def test_user_admin_page_post_with_report(self):
         """set the user's group"""
         group = Group.objects.get(name="editor")
         self.assertEqual(
@@ -129,8 +115,7 @@ class UserAdminViews(TestCase):
         request = self.factory.post("", {"groups": [group.id]})
         request.user = self.local_user
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            result = view(request, self.local_user.id, report.id)
+        result = view(request, self.local_user.id, report.id)
 
         self.assertIsInstance(result, TemplateResponse)
         validate_html(result.render())
