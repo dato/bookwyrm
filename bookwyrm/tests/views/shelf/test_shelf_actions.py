@@ -9,56 +9,44 @@ from django.test.client import RequestFactory
 from bookwyrm import forms, models, views
 
 
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.lists_stream.populate_lists_task.delay")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
-@patch("bookwyrm.activitystreams.remove_book_statuses_task.delay")
 class ShelfActionViews(TestCase):
     """tag views"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
-            cls.another_user = models.User.objects.create_user(
-                "rat@local.com",
-                "rat@rat.com",
-                "ratword",
-                local=True,
-                localname="rat",
-                remote_id="https://example.com/users/rat",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
+        cls.another_user = models.User.objects.create_user(
+            "rat@local.com",
+            "rat@rat.com",
+            "ratword",
+            local=True,
+            localname="rat",
+            remote_id="https://example.com/users/rat",
+        )
         cls.work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Example Edition",
             remote_id="https://example.com/book/1",
             parent_work=cls.work,
         )
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            cls.shelf = models.Shelf.objects.create(
-                name="Test Shelf", identifier="test-shelf", user=cls.local_user
-            )
+        cls.shelf = models.Shelf.objects.create(
+            name="Test Shelf", identifier="test-shelf", user=cls.local_user
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
         """individual test setup"""
         self.factory = RequestFactory()
 
-    def test_shelve(self, *_):
+    def test_shelve(self):
         """shelve a book"""
         request = self.factory.post(
             "", {"book": self.book.id, "shelf": self.shelf.identifier}
@@ -78,46 +66,43 @@ class ShelfActionViews(TestCase):
         # make sure the book is on the shelf
         self.assertEqual(self.shelf.books.get(), self.book)
 
-    def test_shelve_to_read(self, *_):
+    def test_shelve_to_read(self):
         """special behavior for the to-read shelf"""
         shelf = models.Shelf.objects.get(user=self.local_user, identifier="to-read")
         request = self.factory.post(
             "", {"book": self.book.id, "shelf": shelf.identifier}
         )
         request.user = self.local_user
+        views.shelve(request)
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.shelve(request)
         # make sure the book is on the shelf
         self.assertEqual(shelf.books.get(), self.book)
 
-    def test_shelve_reading(self, *_):
+    def test_shelve_reading(self):
         """special behavior for the reading shelf"""
         shelf = models.Shelf.objects.get(user=self.local_user, identifier="reading")
         request = self.factory.post(
             "", {"book": self.book.id, "shelf": shelf.identifier}
         )
         request.user = self.local_user
+        views.shelve(request)
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.shelve(request)
         # make sure the book is on the shelf
         self.assertEqual(shelf.books.get(), self.book)
 
-    def test_shelve_read(self, *_):
+    def test_shelve_read(self):
         """special behavior for the read shelf"""
         shelf = models.Shelf.objects.get(user=self.local_user, identifier="read")
         request = self.factory.post(
             "", {"book": self.book.id, "shelf": shelf.identifier}
         )
         request.user = self.local_user
+        views.shelve(request)
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.shelve(request)
         # make sure the book is on the shelf
         self.assertEqual(shelf.books.get(), self.book)
 
-    def test_shelve_read_with_change_shelf(self, *_):
+    def test_shelve_read_with_change_shelf(self):
         """special behavior for the read shelf"""
         previous_shelf = models.Shelf.objects.get(
             user=self.local_user, identifier="reading"
@@ -136,19 +121,17 @@ class ShelfActionViews(TestCase):
             },
         )
         request.user = self.local_user
+        views.shelve(request)
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.shelve(request)
         # make sure the book is on the shelf
         self.assertEqual(shelf.books.get(), self.book)
         self.assertEqual(list(previous_shelf.books.all()), [])
 
-    def test_unshelve(self, *_):
+    def test_unshelve(self):
         """remove a book from a shelf"""
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            models.ShelfBook.objects.create(
-                book=self.book, user=self.local_user, shelf=self.shelf
-            )
+        models.ShelfBook.objects.create(
+            book=self.book, user=self.local_user, shelf=self.shelf
+        )
         item = models.ShelfBook.objects.get()
 
         self.shelf.save()
@@ -164,7 +147,7 @@ class ShelfActionViews(TestCase):
         self.assertEqual(activity["object"]["id"], item.remote_id)
         self.assertEqual(self.shelf.books.count(), 0)
 
-    def test_create_shelf(self, *_):
+    def test_create_shelf(self):
         """a brand new custom shelf"""
         form = forms.ShelfForm()
         form.data["user"] = self.local_user.id
@@ -181,7 +164,7 @@ class ShelfActionViews(TestCase):
         self.assertEqual(shelf.description, "desc")
         self.assertEqual(shelf.user, self.local_user)
 
-    def test_create_shelf_wrong_user(self, *_):
+    def test_create_shelf_wrong_user(self):
         """a brand new custom shelf"""
         form = forms.ShelfForm()
         form.data["user"] = self.another_user.id
@@ -194,7 +177,7 @@ class ShelfActionViews(TestCase):
         with self.assertRaises(PermissionDenied):
             views.create_shelf(request)
 
-    def test_delete_shelf(self, *_):
+    def test_delete_shelf(self):
         """delete a brand new custom shelf"""
         request = self.factory.post("")
         request.user = self.local_user
@@ -204,7 +187,7 @@ class ShelfActionViews(TestCase):
 
         self.assertFalse(models.Shelf.objects.filter(id=shelf_id).exists())
 
-    def test_delete_shelf_unauthorized(self, *_):
+    def test_delete_shelf_unauthorized(self):
         """delete a brand new custom shelf"""
         request = self.factory.post("")
         request.user = self.another_user
@@ -214,12 +197,11 @@ class ShelfActionViews(TestCase):
 
         self.assertTrue(models.Shelf.objects.filter(id=self.shelf.id).exists())
 
-    def test_delete_shelf_has_book(self, *_):
+    def test_delete_shelf_has_book(self):
         """delete a brand new custom shelf"""
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            models.ShelfBook.objects.create(
-                book=self.book, user=self.local_user, shelf=self.shelf
-            )
+        models.ShelfBook.objects.create(
+            book=self.book, user=self.local_user, shelf=self.shelf
+        )
         request = self.factory.post("")
         request.user = self.local_user
 
@@ -228,7 +210,7 @@ class ShelfActionViews(TestCase):
 
         self.assertTrue(models.Shelf.objects.filter(id=self.shelf.id).exists())
 
-    def test_delete_shelf_not_editable(self, *_):
+    def test_delete_shelf_not_editable(self):
         """delete a brand new custom shelf"""
         shelf = self.local_user.shelf_set.first()
         self.assertFalse(shelf.editable)
