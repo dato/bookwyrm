@@ -17,31 +17,21 @@ class ListViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         work = models.Work.objects.create(title="Work")
         cls.book = models.Edition.objects.create(
             title="Example Edition",
             remote_id="https://example.com/book/1",
             parent_work=work,
         )
-
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-        ):
-            cls.list = models.List.objects.create(name="Test List", user=cls.local_user)
+        cls.list = models.List.objects.create(name="Test List", user=cls.local_user)
 
         models.SiteSettings.objects.create()
 
@@ -56,14 +46,13 @@ class ListViews(TestCase):
         view = views.unsafe_embed_list
         request = self.factory.get("")
         request.user = self.anonymous_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            models.ListItem.objects.create(
-                book_list=self.list,
-                user=self.local_user,
-                book=self.book,
-                approved=True,
-                order=1,
-            )
+        models.ListItem.objects.create(
+            book_list=self.list,
+            user=self.local_user,
+            book=self.book,
+            approved=True,
+            order=1,
+        )
 
         with patch("bookwyrm.views.list.list.is_api_request") as is_api:
             is_api.return_value = False
@@ -75,15 +64,13 @@ class ListViews(TestCase):
         view = views.unsafe_embed_list
         request = self.factory.get("")
         request.user = self.anonymous_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            models.ListItem.objects.create(
-                book_list=self.list,
-                user=self.local_user,
-                book=self.book,
-                approved=True,
-                order=1,
-            )
-
+        models.ListItem.objects.create(
+            book_list=self.list,
+            user=self.local_user,
+            book=self.book,
+            approved=True,
+            order=1,
+        )
         embed_key = str(self.list.embed_key.hex)
 
         with patch("bookwyrm.views.list.list.is_api_request") as is_api:

@@ -15,42 +15,35 @@ from bookwyrm.tests.validate_html import validate_html
 SessionStore = import_module(settings.SESSION_ENGINE).SessionStore
 
 
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
 class LoginViews(TestCase):
     """login and password management"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@your.domain.here",
-                "mouse@mouse.com",
-                "password",
-                local=True,
-                localname="mouse",
-                two_factor_auth=False,
-            )
-            cls.rat = models.User.objects.create_user(
-                "rat@your.domain.here",
-                "rat@rat.com",
-                "password",
-                local=True,
-                localname="rat",
-            )
-            cls.badger = models.User.objects.create_user(
-                "badger@your.domain.here",
-                "badger@badger.com",
-                "password",
-                local=True,
-                localname="badger",
-                two_factor_auth=True,
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@your.domain.here",
+            "mouse@mouse.com",
+            "password",
+            local=True,
+            localname="mouse",
+            two_factor_auth=False,
+        )
+        cls.rat = models.User.objects.create_user(
+            "rat@your.domain.here",
+            "rat@rat.com",
+            "password",
+            local=True,
+            localname="rat",
+        )
+        cls.badger = models.User.objects.create_user(
+            "badger@your.domain.here",
+            "badger@badger.com",
+            "password",
+            local=True,
+            localname="badger",
+            two_factor_auth=True,
+        )
         models.SiteSettings.objects.create(id=1, require_confirm_email=False)
 
     def setUp(self):
@@ -59,7 +52,7 @@ class LoginViews(TestCase):
         self.anonymous_user = AnonymousUser
         self.anonymous_user.is_authenticated = False
 
-    def test_login_get(self, *_):
+    def test_login_get(self):
         """there are so many views, this just makes sure it LOADS"""
         login = views.Login.as_view()
         request = self.factory.get("")
@@ -75,7 +68,7 @@ class LoginViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_login_post_localname(self, *_):
+    def test_login_post_localname(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Login.as_view()
         form = forms.LoginForm()
@@ -93,7 +86,7 @@ class LoginViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_login_post_username(self, *_):
+    def test_login_post_username(self):
         """valid login where the user provides their user@domain.com username"""
         view = views.Login.as_view()
         form = forms.LoginForm()
@@ -111,7 +104,7 @@ class LoginViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_login_post_email(self, *_):
+    def test_login_post_email(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Login.as_view()
         form = forms.LoginForm()
@@ -129,7 +122,7 @@ class LoginViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_login_post_invalid_credentials(self, *_):
+    def test_login_post_invalid_credentials(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.Login.as_view()
         form = forms.LoginForm()
@@ -151,7 +144,7 @@ class LoginViews(TestCase):
             "Username or password are incorrect",
         )
 
-    def test_login_post_no_2fa_set(self, *_):
+    def test_login_post_no_2fa_set(self):
         """test user with 2FA null value is redirected to 2FA prompt page"""
         view = views.Login.as_view()
         form = forms.LoginForm()
@@ -169,7 +162,7 @@ class LoginViews(TestCase):
         self.assertEqual(result.url, "/2fa-prompt")
         self.assertEqual(result.status_code, 302)
 
-    def test_login_post_with_2fa(self, *_):
+    def test_login_post_with_2fa(self):
         """test user with 2FA turned on is redirected to 2FA login page"""
         view = views.Login.as_view()
         form = forms.LoginForm()

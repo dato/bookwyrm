@@ -14,42 +14,31 @@ from bookwyrm import forms, models, views
 from bookwyrm.tests.validate_html import validate_html
 
 
-@patch("bookwyrm.suggested_users.remove_user_task.delay")
 class EditUserViews(TestCase):
     """view user and edit profile"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.rat = models.User.objects.create_user(
-                "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.rat = models.User.objects.create_user(
+            "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
+        )
 
-            cls.book = models.Edition.objects.create(
-                title="test", parent_work=models.Work.objects.create(title="test work")
-            )
-            with (
-                patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-                patch("bookwyrm.activitystreams.add_book_statuses_task.delay"),
-            ):
-                models.ShelfBook.objects.create(
-                    book=cls.book,
-                    user=cls.local_user,
-                    shelf=cls.local_user.shelf_set.first(),
-                )
-
+        cls.book = models.Edition.objects.create(
+            title="test", parent_work=models.Work.objects.create(title="test work")
+        )
+        models.ShelfBook.objects.create(
+            book=cls.book,
+            user=cls.local_user,
+            shelf=cls.local_user.shelf_set.first(),
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
@@ -58,7 +47,7 @@ class EditUserViews(TestCase):
         self.anonymous_user = AnonymousUser
         self.anonymous_user.is_authenticated = False
 
-    def test_edit_user_page(self, _):
+    def test_edit_user_page(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.EditUser.as_view()
         request = self.factory.get("")
@@ -68,7 +57,7 @@ class EditUserViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    def test_edit_user(self, _):
+    def test_edit_user(self):
         """use a form to update a user"""
         view = views.EditUser.as_view()
         form = forms.EditUserForm(instance=self.local_user)
@@ -88,7 +77,7 @@ class EditUserViews(TestCase):
         self.assertEqual(self.local_user.name, "New Name")
         self.assertEqual(self.local_user.email, "wow@email.com")
 
-    def test_edit_user_avatar(self, _):
+    def test_edit_user_avatar(self):
         """use a form to update a user"""
         view = views.EditUser.as_view()
         form = forms.EditUserForm(instance=self.local_user)
@@ -117,7 +106,7 @@ class EditUserViews(TestCase):
         self.assertEqual(self.local_user.avatar.width, 120)
         self.assertEqual(self.local_user.avatar.height, 120)
 
-    def test_crop_avatar(self, _):
+    def test_crop_avatar(self):
         """reduce that image size"""
         image_path = pathlib.Path(__file__).parent.joinpath(
             "../../../static/images/no_cover.jpg"

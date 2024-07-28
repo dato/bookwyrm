@@ -13,40 +13,29 @@ class InboxActivities(TestCase):
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         cls.local_user.remote_id = "https://example.com/user/mouse"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
-
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_status_task.delay"),
-        ):
-            cls.status = models.Status.objects.create(
-                user=cls.local_user,
-                content="Test status",
-                remote_id="https://example.com/status/1",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
+        cls.status = models.Status.objects.create(
+            user=cls.local_user,
+            content="Test status",
+            remote_id="https://example.com/status/1",
+        )
 
         models.SiteSettings.objects.create()
 
@@ -61,8 +50,7 @@ class InboxActivities(TestCase):
             "object": {},
         }
 
-    @patch("bookwyrm.activitystreams.handle_boost_task.delay")
-    def test_boost(self, _):
+    def test_boost(self):
         """boost a status"""
         self.assertEqual(models.Notification.objects.count(), 0)
         activity = {
@@ -88,8 +76,7 @@ class InboxActivities(TestCase):
         self.assertEqual(notification.related_status, self.status)
 
     @responses.activate
-    @patch("bookwyrm.activitystreams.handle_boost_task.delay")
-    def test_boost_remote_status(self, _):
+    def test_boost_remote_status(self):
         """boost a status from a remote server"""
         work = models.Work.objects.create(title="work title")
         book = models.Edition.objects.create(
@@ -143,8 +130,7 @@ class InboxActivities(TestCase):
             content="hi",
             user=self.remote_user,
         )
-        with patch("bookwyrm.activitystreams.add_status_task.delay"):
-            status.save(broadcast=False)
+        status.save(broadcast=False)
         activity = {
             "type": "Announce",
             "id": "http://www.faraway.com/boost/12",
@@ -160,10 +146,7 @@ class InboxActivities(TestCase):
         views.inbox.activity_task(activity)
         self.assertEqual(models.Boost.objects.count(), 0)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    @patch("bookwyrm.activitystreams.handle_boost_task.delay")
-    @patch("bookwyrm.activitystreams.remove_status_task.delay")
-    def test_unboost(self, *_):
+    def test_unboost(self):
         """undo a boost"""
         boost = models.Boost.objects.create(
             boosted_status=self.status, user=self.remote_user
