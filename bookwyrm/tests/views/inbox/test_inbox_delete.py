@@ -13,36 +13,29 @@ class InboxActivities(TestCase):
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         cls.local_user.remote_id = "https://example.com/user/mouse"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
-        with patch("bookwyrm.activitystreams.add_status_task.delay"):
-            cls.status = models.Status.objects.create(
-                user=cls.remote_user,
-                content="Test status",
-                remote_id="https://example.com/status/1",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
+        cls.status = models.Status.objects.create(
+            user=cls.remote_user,
+            content="Test status",
+            remote_id="https://example.com/status/1",
+        )
 
         models.SiteSettings.objects.create()
 
@@ -98,9 +91,7 @@ class InboxActivities(TestCase):
         self.assertEqual(models.Notification.objects.count(), 1)
         self.assertEqual(models.Notification.objects.get(), notif)
 
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    @patch("bookwyrm.activitystreams.remove_status_task.delay")
-    def test_delete_user(self, *_):
+    def test_delete_user(self):
         """delete a user"""
         self.assertTrue(models.User.objects.get(username="rat@example.com").is_active)
         activity = {

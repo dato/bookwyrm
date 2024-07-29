@@ -6,42 +6,31 @@ from django.test import TestCase
 from bookwyrm import activitystreams, models
 
 
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
 class Activitystreams(TestCase):
     """using redis to build activity streams"""
 
     @classmethod
     def setUpTestData(cls):
         """use a test csv"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True, localname="mouse"
-            )
-            cls.another_user = models.User.objects.create_user(
-                "nutria",
-                "nutria@nutria.nutria",
-                "password",
-                local=True,
-                localname="nutria",
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True, localname="mouse"
+        )
+        cls.another_user = models.User.objects.create_user(
+            "nutria",
+            "nutria@nutria.nutria",
+            "password",
+            local=True,
+            localname="nutria",
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         work = models.Work.objects.create(title="test work")
         cls.book = models.Edition.objects.create(title="test book", parent_work=work)
 
@@ -55,7 +44,7 @@ class Activitystreams(TestCase):
 
         self.test_stream = TestStream()
 
-    def test_activitystream_class_ids(self, *_):
+    def test_activitystream_class_ids(self):
         """the abstract base class for stream objects"""
         self.assertEqual(
             self.test_stream.stream_id(self.local_user.id),
@@ -66,14 +55,14 @@ class Activitystreams(TestCase):
             f"{self.local_user.id}-test-unread",
         )
 
-    def test_unread_by_status_type_id(self, *_):
+    def test_unread_by_status_type_id(self):
         """stream for status type"""
         self.assertEqual(
             self.test_stream.unread_by_status_type_id(self.local_user.id),
             f"{self.local_user.id}-test-unread-by-type",
         )
 
-    def test_get_rank(self, *_):
+    def test_get_rank(self):
         """sort order"""
         date = datetime(2022, 1, 28, 0, 0, tzinfo=timezone.utc)
         status = models.Status.objects.create(
@@ -87,7 +76,7 @@ class Activitystreams(TestCase):
             "1643328000.0",
         )
 
-    def test_get_activity_stream(self, *_):
+    def test_get_activity_stream(self):
         """load statuses"""
         status = models.Status.objects.create(
             user=self.remote_user,
@@ -118,7 +107,7 @@ class Activitystreams(TestCase):
         self.assertEqual(result.last(), status)
         self.assertIsInstance(result.first(), models.Comment)
 
-    def test_abstractstream_get_audience(self, *_):
+    def test_abstractstream_get_audience(self):
         """get a list of users that should see a status"""
         status = models.Status.objects.create(
             user=self.remote_user, content="hi", privacy="public"
@@ -129,7 +118,7 @@ class Activitystreams(TestCase):
         self.assertTrue(self.local_user.id in users)
         self.assertTrue(self.another_user.id in users)
 
-    def test_abstractstream_get_audience_direct(self, *_):
+    def test_abstractstream_get_audience_direct(self):
         """get a list of users that should see a status"""
         status = models.Status.objects.create(
             user=self.remote_user,
@@ -152,7 +141,7 @@ class Activitystreams(TestCase):
         self.assertFalse(self.another_user.id in users)
         self.assertFalse(self.remote_user.id in users)
 
-    def test_abstractstream_get_audience_followers_remote_user(self, *_):
+    def test_abstractstream_get_audience_followers_remote_user(self):
         """get a list of users that should see a status"""
         status = models.Status.objects.create(
             user=self.remote_user,
@@ -162,7 +151,7 @@ class Activitystreams(TestCase):
         users = self.test_stream.get_audience(status)
         self.assertEqual(users, [])
 
-    def test_abstractstream_get_audience_followers_self(self, *_):
+    def test_abstractstream_get_audience_followers_self(self):
         """get a list of users that should see a status"""
         status = models.Comment.objects.create(
             user=self.local_user,
@@ -175,7 +164,7 @@ class Activitystreams(TestCase):
         self.assertFalse(self.another_user.id in users)
         self.assertFalse(self.remote_user.id in users)
 
-    def test_abstractstream_get_audience_followers_with_mention(self, *_):
+    def test_abstractstream_get_audience_followers_with_mention(self):
         """get a list of users that should see a status"""
         status = models.Comment.objects.create(
             user=self.remote_user,
@@ -190,7 +179,7 @@ class Activitystreams(TestCase):
         self.assertFalse(self.another_user.id in users)
         self.assertFalse(self.remote_user.id in users)
 
-    def test_abstractstream_get_audience_followers_with_relationship(self, *_):
+    def test_abstractstream_get_audience_followers_with_relationship(self):
         """get a list of users that should see a status"""
         self.remote_user.followers.add(self.local_user)
         status = models.Comment.objects.create(

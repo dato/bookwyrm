@@ -1,5 +1,4 @@
 """ test for app action functionality """
-from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser
 from django.template.response import TemplateResponse
@@ -16,19 +15,14 @@ class DirectoryViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
@@ -37,11 +31,7 @@ class DirectoryViews(TestCase):
         self.anonymous_user = AnonymousUser
         self.anonymous_user.is_authenticated = False
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    @patch("bookwyrm.lists_stream.populate_lists_task.delay")
-    @patch("bookwyrm.suggested_users.rerank_user_task.delay")
-    def test_directory_page(self, *_):
+    def test_directory_page(self):
         """there are so many views, this just makes sure it LOADS"""
         models.User.objects.create_user(
             "rat@local.com",

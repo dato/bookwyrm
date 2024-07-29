@@ -1,5 +1,4 @@
 """ testing models """
-from unittest.mock import patch
 from django.http import Http404
 from django.test import TestCase
 
@@ -15,24 +14,18 @@ class BaseModel(TestCase):
     @classmethod
     def setUpTestData(cls):
         """shared data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.com", "mouseword", local=True, localname="mouse"
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.com", "mouseword", local=True, localname="mouse"
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
 
     def setUp(self):
         class BookWyrmTestModel(base_model.BookWyrmModel):
@@ -67,8 +60,7 @@ class BaseModel(TestCase):
         base_model.set_remote_id(None, instance, False)
         self.assertIsNone(instance.remote_id)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_object_visible_to_user(self, _):
+    def test_object_visible_to_user(self):
         """does a user have permission to view an object"""
         obj = models.Status.objects.create(
             content="hi", user=self.remote_user, privacy="public"
@@ -98,8 +90,7 @@ class BaseModel(TestCase):
         obj.mention_users.add(self.local_user)
         self.assertIsNone(obj.raise_visible_to_user(self.local_user))
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_object_visible_to_user_follower(self, _):
+    def test_object_visible_to_user_follower(self):
         """what you can see if you follow a user"""
         self.remote_user.followers.add(self.local_user)
         obj = models.Status.objects.create(
@@ -119,8 +110,7 @@ class BaseModel(TestCase):
         obj.mention_users.add(self.local_user)
         self.assertIsNone(obj.raise_visible_to_user(self.local_user))
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_object_visible_to_user_blocked(self, _):
+    def test_object_visible_to_user_blocked(self):
         """you can't see it if they block you"""
         self.remote_user.blocks.add(self.local_user)
         obj = models.Status.objects.create(

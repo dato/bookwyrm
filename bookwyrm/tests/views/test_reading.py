@@ -1,5 +1,4 @@
 """ test for app action functionality """
-from unittest.mock import patch
 import dateutil
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -8,39 +7,29 @@ from django.utils import timezone
 from bookwyrm import models, views
 
 
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
 class ReadingViews(TestCase):
     """viewing and creating statuses"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         cls.work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Test Book",
@@ -52,7 +41,7 @@ class ReadingViews(TestCase):
         """individual test setup"""
         self.factory = RequestFactory()
 
-    def test_start_reading(self, *_):
+    def test_start_reading(self):
         """begin a book"""
         shelf = self.local_user.shelf_set.get(identifier=models.Shelf.READING)
         self.assertFalse(shelf.books.exists())
@@ -70,8 +59,7 @@ class ReadingViews(TestCase):
             },
         )
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.ReadingStatus.as_view()(request, "start", self.book.id)
+        views.ReadingStatus.as_view()(request, "start", self.book.id)
 
         self.assertEqual(shelf.books.get(), self.book)
 
@@ -86,7 +74,7 @@ class ReadingViews(TestCase):
         self.assertEqual(readthrough.user, self.local_user)
         self.assertEqual(readthrough.book, self.book)
 
-    def test_start_reading_with_comment(self, *_):
+    def test_start_reading_with_comment(self):
         """begin a book"""
         shelf = self.local_user.shelf_set.get(identifier=models.Shelf.READING)
         self.assertFalse(shelf.books.exists())
@@ -106,8 +94,7 @@ class ReadingViews(TestCase):
             },
         )
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.ReadingStatus.as_view()(request, "start", self.book.id)
+        views.ReadingStatus.as_view()(request, "start", self.book.id)
 
         self.assertEqual(shelf.books.get(), self.book)
 
@@ -125,15 +112,12 @@ class ReadingViews(TestCase):
         self.assertEqual(readthrough.user, self.local_user)
         self.assertEqual(readthrough.book, self.book)
 
-    @patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
-    @patch("bookwyrm.activitystreams.remove_book_statuses_task.delay")
-    def test_start_reading_reshelve(self, *_):
+    def test_start_reading_reshelve(self):
         """begin a book"""
         to_read_shelf = self.local_user.shelf_set.get(identifier=models.Shelf.TO_READ)
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            models.ShelfBook.objects.create(
-                shelf=to_read_shelf, book=self.book, user=self.local_user
-            )
+        models.ShelfBook.objects.create(
+            shelf=to_read_shelf, book=self.book, user=self.local_user
+        )
         shelf = self.local_user.shelf_set.get(identifier="reading")
         self.assertEqual(to_read_shelf.books.get(), self.book)
         self.assertFalse(shelf.books.exists())
@@ -141,13 +125,12 @@ class ReadingViews(TestCase):
 
         request = self.factory.post("")
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.ReadingStatus.as_view()(request, "start", self.book.id)
+        views.ReadingStatus.as_view()(request, "start", self.book.id)
 
         self.assertFalse(to_read_shelf.books.exists())
         self.assertEqual(shelf.books.get(), self.book)
 
-    def test_finish_reading(self, *_):
+    def test_finish_reading(self):
         """begin a book"""
         shelf = self.local_user.shelf_set.get(identifier=models.Shelf.READ_FINISHED)
         self.assertFalse(shelf.books.exists())
@@ -167,9 +150,7 @@ class ReadingViews(TestCase):
             },
         )
         request.user = self.local_user
-
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.ReadingStatus.as_view()(request, "finish", self.book.id)
+        views.ReadingStatus.as_view()(request, "finish", self.book.id)
 
         self.assertEqual(shelf.books.get(), self.book)
 
@@ -184,7 +165,7 @@ class ReadingViews(TestCase):
         self.assertEqual(readthrough.user, self.local_user)
         self.assertEqual(readthrough.book, self.book)
 
-    def test_edit_readthrough(self, *_):
+    def test_edit_readthrough(self):
         """adding dates to an ongoing readthrough"""
         start = timezone.make_aware(dateutil.parser.parse("2021-01-03"))
         readthrough = models.ReadThrough.objects.create(
@@ -211,7 +192,7 @@ class ReadingViews(TestCase):
         self.assertEqual(readthrough.finish_date.day, 7)
         self.assertEqual(readthrough.book, self.book)
 
-    def test_delete_readthrough(self, *_):
+    def test_delete_readthrough(self):
         """remove a readthrough"""
         readthrough = models.ReadThrough.objects.create(
             book=self.book, user=self.local_user
@@ -228,7 +209,7 @@ class ReadingViews(TestCase):
         views.delete_readthrough(request)
         self.assertFalse(models.ReadThrough.objects.filter(id=readthrough.id).exists())
 
-    def test_create_readthrough(self, *_):
+    def test_create_readthrough(self):
         """adding new read dates"""
         request = self.factory.post(
             "",
@@ -253,7 +234,7 @@ class ReadingViews(TestCase):
         self.assertEqual(readthrough.book, self.book)
         self.assertEqual(readthrough.user, self.local_user)
 
-    def test_update_progress_comment(self, *_):
+    def test_update_progress_comment(self):
         """update progress with commentary"""
         readthrough = models.ReadThrough.objects.create(
             user=self.local_user, start_date=timezone.now(), book=self.book
@@ -274,8 +255,7 @@ class ReadingViews(TestCase):
             },
         )
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            views.update_progress(request, self.book.id)
+        views.update_progress(request, self.book.id)
 
         status = models.Comment.objects.get()
         self.assertEqual(status.user, self.local_user)

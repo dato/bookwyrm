@@ -1,6 +1,5 @@
 """ test for app action functionality """
 import json
-from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser
 from django.http import JsonResponse
@@ -16,31 +15,25 @@ class WellknownViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            models.User.objects.create_user(
-                "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            models.User.objects.create_user(
-                "rat",
-                "rat@remote.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        models.User.objects.create_user(
+            "rat@local.com", "rat@rat.rat", "password", local=True, localname="rat"
+        )
+        models.User.objects.create_user(
+            "rat",
+            "rat@remote.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):

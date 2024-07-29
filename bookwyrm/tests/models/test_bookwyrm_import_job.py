@@ -18,51 +18,45 @@ class BookwyrmImport(TestCase):
 
     def setUp(self):
         """setting stuff up"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-        ):
-            self.local_user = models.User.objects.create_user(
-                "mouse",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-                name="Mouse",
-                summary="I'm a real bookmouse",
-                manually_approves_followers=False,
-                hide_follows=False,
-                show_goal=True,
-                show_suggested_users=True,
-                discoverable=True,
-                preferred_timezone="America/Los Angeles",
-                default_post_privacy="public",
-            )
+        self.local_user = models.User.objects.create_user(
+            "mouse",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+            name="Mouse",
+            summary="I'm a real bookmouse",
+            manually_approves_followers=False,
+            hide_follows=False,
+            show_goal=True,
+            show_suggested_users=True,
+            discoverable=True,
+            preferred_timezone="America/Los Angeles",
+            default_post_privacy="public",
+        )
 
-            self.rat_user = models.User.objects.create_user(
-                "rat", "rat@rat.rat", "password", local=True, localname="rat"
-            )
+        self.rat_user = models.User.objects.create_user(
+            "rat", "rat@rat.rat", "password", local=True, localname="rat"
+        )
 
-            self.badger_user = models.User.objects.create_user(
-                "badger",
-                "badger@badger.badger",
-                "password",
-                local=True,
-                localname="badger",
-            )
+        self.badger_user = models.User.objects.create_user(
+            "badger",
+            "badger@badger.badger",
+            "password",
+            local=True,
+            localname="badger",
+        )
 
-            self.work = models.Work.objects.create(title="Sand Talk")
+        self.work = models.Work.objects.create(title="Sand Talk")
 
-            self.book = models.Edition.objects.create(
-                title="Sand Talk",
-                remote_id="https://example.com/book/1234",
-                openlibrary_key="OL28216445M",
-                inventaire_id="isbn:9780062975645",
-                isbn_13="9780062975645",
-                parent_work=self.work,
-            )
+        self.book = models.Edition.objects.create(
+            title="Sand Talk",
+            remote_id="https://example.com/book/1234",
+            openlibrary_key="OL28216445M",
+            inventaire_id="isbn:9780062975645",
+            isbn_13="9780062975645",
+            parent_work=self.work,
+        )
 
         self.json_file = pathlib.Path(__file__).parent.joinpath(
             "../data/user_import.json"
@@ -77,67 +71,49 @@ class BookwyrmImport(TestCase):
 
     def test_update_user_profile(self):
         """Test update the user's profile from import data"""
-
         with (
-            patch("bookwyrm.suggested_users.remove_user_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
+            open(self.archive_file, "rb") as fileobj,
+            BookwyrmTarFile.open(mode="r:gz", fileobj=fileobj) as tarfile,
         ):
-            with (
-                open(self.archive_file, "rb") as fileobj,
-                BookwyrmTarFile.open(mode="r:gz", fileobj=fileobj) as tarfile,
-            ):
-                models.bookwyrm_import_job.update_user_profile(
-                    self.local_user, tarfile, self.json_data
-                )
-
-            self.local_user.refresh_from_db()
-
-            self.assertEqual(
-                self.local_user.username, "mouse"
-            )  # username should not change
-            self.assertEqual(self.local_user.name, "Rat")
-            self.assertEqual(
-                self.local_user.summary,
-                "I love to make soup in Paris and eat pizza in New York",
+            models.bookwyrm_import_job.update_user_profile(
+                self.local_user, tarfile, self.json_data
             )
+
+        self.local_user.refresh_from_db()
+
+        self.assertEqual(
+            self.local_user.username, "mouse"
+        )  # username should not change
+        self.assertEqual(self.local_user.name, "Rat")
+        self.assertEqual(
+            self.local_user.summary,
+            "I love to make soup in Paris and eat pizza in New York",
+        )
 
     def test_update_user_settings(self):
         """Test updating the user's settings from import data"""
+        models.bookwyrm_import_job.update_user_settings(self.local_user, self.json_data)
+        self.local_user.refresh_from_db()
 
-        with (
-            patch("bookwyrm.suggested_users.remove_user_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-        ):
-            models.bookwyrm_import_job.update_user_settings(
-                self.local_user, self.json_data
-            )
-            self.local_user.refresh_from_db()
-
-            self.assertEqual(self.local_user.manually_approves_followers, True)
-            self.assertEqual(self.local_user.hide_follows, True)
-            self.assertEqual(self.local_user.show_goal, False)
-            self.assertEqual(self.local_user.show_suggested_users, False)
-            self.assertEqual(self.local_user.discoverable, False)
-            self.assertEqual(self.local_user.preferred_timezone, "Australia/Adelaide")
-            self.assertEqual(self.local_user.default_post_privacy, "followers")
+        self.assertEqual(self.local_user.manually_approves_followers, True)
+        self.assertEqual(self.local_user.hide_follows, True)
+        self.assertEqual(self.local_user.show_goal, False)
+        self.assertEqual(self.local_user.show_suggested_users, False)
+        self.assertEqual(self.local_user.discoverable, False)
+        self.assertEqual(self.local_user.preferred_timezone, "Australia/Adelaide")
+        self.assertEqual(self.local_user.default_post_privacy, "followers")
 
     def test_update_goals(self):
         """Test update the user's goals from import data"""
-
         models.AnnualGoal.objects.create(
             user=self.local_user,
             year=2023,
             goal=999,
             privacy="public",
         )
-
         goals = [{"goal": 12, "year": 2023, "privacy": "followers"}]
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-
-            models.bookwyrm_import_job.update_goals(self.local_user, goals)
+        models.bookwyrm_import_job.update_goals(self.local_user, goals)
 
         self.local_user.refresh_from_db()
         goal = models.AnnualGoal.objects.get()
@@ -147,27 +123,19 @@ class BookwyrmImport(TestCase):
 
     def test_upsert_saved_lists_existing(self):
         """Test upserting an existing saved list"""
-
-        with (
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            book_list = models.List.objects.create(
-                name="My cool list",
-                user=self.rat_user,
-                remote_id="https://local.lists/9999",
-            )
-
+        book_list = models.List.objects.create(
+            name="My cool list",
+            user=self.rat_user,
+            remote_id="https://local.lists/9999",
+        )
         self.assertFalse(self.local_user.saved_lists.filter(id=book_list.id).exists())
 
         self.local_user.saved_lists.add(book_list)
-
         self.assertTrue(self.local_user.saved_lists.filter(id=book_list.id).exists())
 
-        with patch("bookwyrm.activitypub.base_activity.resolve_remote_id"):
-            models.bookwyrm_import_job.upsert_saved_lists(
-                self.local_user, ["https://local.lists/9999"]
-            )
+        models.bookwyrm_import_job.upsert_saved_lists(
+            self.local_user, ["https://local.lists/9999"]
+        )
         saved_lists = self.local_user.saved_lists.filter(
             remote_id="https://local.lists/9999"
         ).all()
@@ -175,44 +143,29 @@ class BookwyrmImport(TestCase):
 
     def test_upsert_saved_lists_not_existing(self):
         """Test upserting a new saved list"""
-
-        with (
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            book_list = models.List.objects.create(
-                name="My cool list",
-                user=self.rat_user,
-                remote_id="https://local.lists/9999",
-            )
-
+        book_list = models.List.objects.create(
+            name="My cool list",
+            user=self.rat_user,
+            remote_id="https://local.lists/9999",
+        )
         self.assertFalse(self.local_user.saved_lists.filter(id=book_list.id).exists())
 
-        with patch("bookwyrm.activitypub.base_activity.resolve_remote_id"):
-            models.bookwyrm_import_job.upsert_saved_lists(
-                self.local_user, ["https://local.lists/9999"]
-            )
-
+        models.bookwyrm_import_job.upsert_saved_lists(
+            self.local_user, ["https://local.lists/9999"]
+        )
         self.assertTrue(self.local_user.saved_lists.filter(id=book_list.id).exists())
 
     def test_upsert_follows(self):
         """Test take a list of remote ids and add as follows"""
-
         before_follow = models.UserFollows.objects.filter(
             user_subject=self.local_user, user_object=self.rat_user
         ).exists()
 
         self.assertFalse(before_follow)
 
-        with (
-            patch("bookwyrm.activitystreams.add_user_statuses_task.delay"),
-            patch("bookwyrm.lists_stream.add_user_lists_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            models.bookwyrm_import_job.upsert_follows(
-                self.local_user, self.json_data.get("follows")
-            )
-
+        models.bookwyrm_import_job.upsert_follows(
+            self.local_user, self.json_data.get("follows")
+        )
         after_follow = models.UserFollows.objects.filter(
             user_subject=self.local_user, user_object=self.rat_user
         ).exists()
@@ -220,7 +173,6 @@ class BookwyrmImport(TestCase):
 
     def test_upsert_user_blocks(self):
         """test adding blocked users"""
-
         blocked_before = models.UserBlocks.objects.filter(
             Q(
                 user_subject=self.local_user,
@@ -229,16 +181,9 @@ class BookwyrmImport(TestCase):
         ).exists()
         self.assertFalse(blocked_before)
 
-        with (
-            patch("bookwyrm.suggested_users.remove_suggestion_task.delay"),
-            patch("bookwyrm.activitystreams.remove_user_statuses_task.delay"),
-            patch("bookwyrm.lists_stream.remove_user_lists_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            models.bookwyrm_import_job.upsert_user_blocks(
-                self.local_user, self.json_data.get("blocks")
-            )
-
+        models.bookwyrm_import_job.upsert_user_blocks(
+            self.local_user, self.json_data.get("blocks")
+        )
         blocked_after = models.UserBlocks.objects.filter(
             Q(
                 user_subject=self.local_user,
@@ -322,10 +267,7 @@ class BookwyrmImport(TestCase):
 
         self.assertEqual(models.Review.objects.filter(user=self.local_user).count(), 0)
         reviews = self.json_data["books"][0]["reviews"]
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True),
-        ):
+        with patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True):
             bookwyrm_import_job.upsert_statuses(
                 self.local_user, models.Review, reviews, self.book.remote_id
             )
@@ -359,10 +301,7 @@ class BookwyrmImport(TestCase):
         self.assertEqual(models.Comment.objects.filter(user=self.local_user).count(), 0)
         comments = self.json_data["books"][1]["comments"]
 
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True),
-        ):
+        with patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True):
             bookwyrm_import_job.upsert_statuses(
                 self.local_user, models.Comment, comments, self.book.remote_id
             )
@@ -388,10 +327,7 @@ class BookwyrmImport(TestCase):
             models.Quotation.objects.filter(user=self.local_user).count(), 0
         )
         quotes = self.json_data["books"][1]["quotations"]
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True),
-        ):
+        with patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=True):
 
             bookwyrm_import_job.upsert_statuses(
                 self.local_user, models.Quotation, quotes, self.book.remote_id
@@ -422,10 +358,7 @@ class BookwyrmImport(TestCase):
             models.Quotation.objects.filter(user=self.local_user).count(), 0
         )
         quotes = self.json_data["books"][1]["quotations"]
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=False),
-        ):
+        with patch("bookwyrm.models.bookwyrm_import_job.is_alias", return_value=False):
 
             bookwyrm_import_job.upsert_statuses(
                 self.local_user, models.Quotation, quotes, self.book.remote_id
@@ -444,17 +377,13 @@ class BookwyrmImport(TestCase):
             title="Another Book", remote_id="https://example.com/book/9876"
         )
 
-        with (
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            book_list = models.List.objects.create(
-                name="my list of books", user=self.local_user
-            )
+        book_list = models.List.objects.create(
+            name="my list of books", user=self.local_user
+        )
 
-            models.ListItem.objects.create(
-                book=self.book, book_list=book_list, user=self.local_user, order=1
-            )
+        models.ListItem.objects.create(
+            book=self.book, book_list=book_list, user=self.local_user, order=1
+        )
 
         self.assertTrue(models.List.objects.filter(id=book_list.id).exists())
         self.assertEqual(models.List.objects.filter(user=self.local_user).count(), 1)
@@ -465,15 +394,11 @@ class BookwyrmImport(TestCase):
             1,
         )
 
-        with (
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            bookwyrm_import_job.upsert_lists(
-                self.local_user,
-                book_data["lists"],
-                other_book.id,
-            )
+        bookwyrm_import_job.upsert_lists(
+            self.local_user,
+            book_data["lists"],
+            other_book.id,
+        )
 
         self.assertEqual(models.List.objects.filter(user=self.local_user).count(), 1)
         self.assertEqual(models.List.objects.filter(user=self.local_user).count(), 1)
@@ -493,15 +418,11 @@ class BookwyrmImport(TestCase):
         self.assertEqual(models.List.objects.filter(user=self.local_user).count(), 0)
         self.assertFalse(models.ListItem.objects.filter(book=self.book.id).exists())
 
-        with (
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            bookwyrm_import_job.upsert_lists(
-                self.local_user,
-                book_data["lists"],
-                self.book.id,
-            )
+        bookwyrm_import_job.upsert_lists(
+            self.local_user,
+            book_data["lists"],
+            self.book.id,
+        )
 
         self.assertEqual(models.List.objects.filter(user=self.local_user).count(), 1)
         self.assertEqual(
@@ -518,20 +439,12 @@ class BookwyrmImport(TestCase):
 
         shelf = models.Shelf.objects.get(name="Read", user=self.local_user)
 
-        with (
-            patch("bookwyrm.activitystreams.add_book_statuses_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            models.ShelfBook.objects.create(
-                book=self.book, shelf=shelf, user=self.local_user
-            )
+        models.ShelfBook.objects.create(
+            book=self.book, shelf=shelf, user=self.local_user
+        )
 
         book_data = self.json_data["books"][0]
-        with (
-            patch("bookwyrm.activitystreams.add_book_statuses_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            bookwyrm_import_job.upsert_shelves(self.book, self.local_user, book_data)
+        bookwyrm_import_job.upsert_shelves(self.book, self.local_user, book_data)
 
         self.assertEqual(
             models.ShelfBook.objects.filter(user=self.local_user.id).count(), 2
@@ -546,12 +459,7 @@ class BookwyrmImport(TestCase):
         )
 
         book_data = self.json_data["books"][0]
-
-        with (
-            patch("bookwyrm.activitystreams.add_book_statuses_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-        ):
-            bookwyrm_import_job.upsert_shelves(self.book, self.local_user, book_data)
+        bookwyrm_import_job.upsert_shelves(self.book, self.local_user, book_data)
 
         self.assertEqual(
             models.ShelfBook.objects.filter(user=self.local_user.id).count(), 2

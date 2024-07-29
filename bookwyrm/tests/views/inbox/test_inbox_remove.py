@@ -1,6 +1,4 @@
 """ tests incoming activities"""
-from unittest.mock import patch
-
 from django.test import TestCase
 
 from bookwyrm import models, views
@@ -12,31 +10,24 @@ class InboxRemove(TestCase):
     @classmethod
     def setUpTestData(cls):
         """basic user and book data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
         cls.local_user.remote_id = "https://example.com/user/mouse"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
-
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         cls.work = models.Work.objects.create(title="work title")
         cls.book = models.Edition.objects.create(
             title="Test",
@@ -77,20 +68,16 @@ class InboxRemove(TestCase):
 
     def test_handle_remove_book_from_list(self):
         """listing a book"""
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-        ):
-            booklist = models.List.objects.create(
-                name="test list",
-                user=self.local_user,
-            )
-            listitem = models.ListItem.objects.create(
-                user=self.local_user,
-                book=self.book,
-                book_list=booklist,
-                order=1,
-            )
+        booklist = models.List.objects.create(
+            name="test list",
+            user=self.local_user,
+        )
+        listitem = models.ListItem.objects.create(
+            user=self.local_user,
+            book=self.book,
+            book_list=booklist,
+            order=1,
+        )
         self.assertEqual(booklist.books.count(), 1)
 
         activity = {
