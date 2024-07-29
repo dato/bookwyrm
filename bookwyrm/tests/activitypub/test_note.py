@@ -1,6 +1,4 @@
 """ tests functionality specifically for the Note ActivityPub dataclass"""
-from unittest.mock import patch
-
 from django.test import TestCase
 
 from bookwyrm import activitypub
@@ -13,14 +11,9 @@ class Note(TestCase):
     @classmethod
     def setUpTestData(cls):
         """create a shared user"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
-            )
+        cls.user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
+        )
         cls.user.remote_id = "https://test-instance.org/user/critic"
         cls.user.save(broadcast=False, update_fields=["remote_id"])
 
