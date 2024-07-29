@@ -14,33 +14,24 @@ import responses
 from bookwyrm import activitypub, models, settings
 
 
-@patch("bookwyrm.models.Status.broadcast")
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.activitystreams.remove_status_task.delay")
 class Status(TestCase):
     """lotta types of statuses"""
 
     @classmethod
     def setUpTestData(cls):
         """useful things for creating a status"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         cls.book = models.Edition.objects.create(title="Test Edition")
 
     def setUp(self):
@@ -50,20 +41,17 @@ class Status(TestCase):
         image_path = pathlib.Path(__file__).parent.joinpath(
             "../../static/images/default_avi.jpg"
         )
-        with (
-            patch("bookwyrm.models.Status.broadcast"),
-            open(image_path, "rb") as image_file,
-        ):
+        with open(image_path, "rb") as image_file:
             self.book.cover.save("test.jpg", image_file)
 
-    def test_status_generated_fields(self, *_):
+    def test_status_generated_fields(self):
         """setting remote id"""
         status = models.Status.objects.create(content="bleh", user=self.local_user)
         expected_id = f"{settings.BASE_URL}/user/mouse/status/{status.id}"
         self.assertEqual(status.remote_id, expected_id)
         self.assertEqual(status.privacy, "public")
 
-    def test_replies(self, *_):
+    def test_replies(self):
         """get a list of replies"""
         parent = models.Status(content="hi", user=self.local_user)
         parent.save(broadcast=False)
@@ -91,7 +79,7 @@ class Status(TestCase):
         self.assertEqual(sibling.thread_id, parent.id)
         self.assertEqual(grandchild.thread_id, parent.id)
 
-    def test_status_type(self, *_):
+    def test_status_type(self):
         """class name"""
         self.assertEqual(models.Status().status_type, "Note")
         self.assertEqual(models.Review().status_type, "Review")
@@ -99,14 +87,14 @@ class Status(TestCase):
         self.assertEqual(models.Comment().status_type, "Comment")
         self.assertEqual(models.Boost().status_type, "Announce")
 
-    def test_boostable(self, *_):
+    def test_boostable(self):
         """can a status be boosted, based on privacy"""
         self.assertTrue(models.Status(privacy="public").boostable)
         self.assertTrue(models.Status(privacy="unlisted").boostable)
         self.assertFalse(models.Status(privacy="followers").boostable)
         self.assertFalse(models.Status(privacy="direct").boostable)
 
-    def test_to_replies(self, *_):
+    def test_to_replies(self):
         """activitypub replies collection"""
         parent = models.Status.objects.create(content="hi", user=self.local_user)
         child = models.Status.objects.create(
@@ -123,7 +111,7 @@ class Status(TestCase):
         self.assertEqual(replies["id"], f"{parent.remote_id}/replies")
         self.assertEqual(replies["totalItems"], 2)
 
-    def test_status_to_activity(self, *_):
+    def test_status_to_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Status.objects.create(
             content="test content", user=self.local_user
@@ -134,7 +122,7 @@ class Status(TestCase):
         self.assertEqual(activity["content"], "<p>test content</p>")
         self.assertEqual(activity["sensitive"], False)
 
-    def test_status_with_hashtag_to_activity(self, *_):
+    def test_status_with_hashtag_to_activity(self):
         """status with hashtag with a "pure" serializer"""
         tag = models.Hashtag.objects.create(name="#content")
         status = models.Status.objects.create(
@@ -153,7 +141,7 @@ class Status(TestCase):
             activity["tag"][0]["href"], f"{settings.BASE_URL}/hashtag/{tag.id}"
         )
 
-    def test_status_with_mention_to_activity(self, *_):
+    def test_status_with_mention_to_activity(self):
         """status with mention with a "pure" serializer"""
         status = models.Status.objects.create(
             content="test @rat@rat.com", user=self.local_user
@@ -169,7 +157,7 @@ class Status(TestCase):
         self.assertEqual(activity["tag"][0]["name"], f"@{self.remote_user.username}")
         self.assertEqual(activity["tag"][0]["href"], self.remote_user.remote_id)
 
-    def test_status_to_activity_tombstone(self, *_):
+    def test_status_to_activity_tombstone(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Status.objects.create(
             content="test content",
@@ -182,7 +170,7 @@ class Status(TestCase):
         self.assertEqual(activity["type"], "Tombstone")
         self.assertFalse(hasattr(activity, "content"))
 
-    def test_status_to_pure_activity(self, *_):
+    def test_status_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Status.objects.create(
             content="test content", user=self.local_user
@@ -194,7 +182,7 @@ class Status(TestCase):
         self.assertEqual(activity["sensitive"], False)
         self.assertEqual(activity["attachment"], [])
 
-    def test_generated_note_to_activity(self, *_):
+    def test_generated_note_to_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.GeneratedNote.objects.create(
             content="test content", user=self.local_user
@@ -208,7 +196,7 @@ class Status(TestCase):
         self.assertEqual(activity["sensitive"], False)
         self.assertEqual(len(activity["tag"]), 2)
 
-    def test_generated_note_to_pure_activity(self, *_):
+    def test_generated_note_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.GeneratedNote.objects.create(
             content="reads", user=self.local_user
@@ -232,7 +220,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_comment_to_activity(self, *_):
+    def test_comment_to_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Comment.objects.create(
             content="test content", user=self.local_user, book=self.book
@@ -243,7 +231,7 @@ class Status(TestCase):
         self.assertEqual(activity["content"], "<p>test content</p>")
         self.assertEqual(activity["inReplyToBook"], self.book.remote_id)
 
-    def test_comment_to_pure_activity(self, *_):
+    def test_comment_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Comment.objects.create(
             content="test content", user=self.local_user, book=self.book, progress=27
@@ -266,7 +254,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_quotation_to_activity(self, *_):
+    def test_quotation_to_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Quotation.objects.create(
             quote="a sickening sense",
@@ -281,7 +269,7 @@ class Status(TestCase):
         self.assertEqual(activity["content"], "<p>test content</p>")
         self.assertEqual(activity["inReplyToBook"], self.book.remote_id)
 
-    def test_quotation_to_pure_activity(self, *_):
+    def test_quotation_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Quotation.objects.create(
             quote="a sickening sense",
@@ -307,7 +295,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_quotation_with_author_to_pure_activity(self, *_):
+    def test_quotation_with_author_to_pure_activity(self):
         """serialization of quotation of a book with author and edition info"""
         self.book.authors.set([models.Author.objects.create(name="Author Name")])
         self.book.physical_format = "worm"
@@ -330,7 +318,7 @@ class Status(TestCase):
             activity["attachment"][0]["name"], "Author Name: Test Edition (worm)"
         )
 
-    def test_quotation_page_serialization(self, *_):
+    def test_quotation_page_serialization(self):
         """serialization of quotation page position"""
         tests = [
             ("single pos", "7", "", "p. 7"),
@@ -358,7 +346,7 @@ class Status(TestCase):
                     expect_re = '^<p>"my quote"</p> <p>— <a .+</a></p>$'
                 self.assertRegex(activity["content"], expect_re)
 
-    def test_review_to_activity(self, *_):
+    def test_review_to_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Review.objects.create(
             name="Review name",
@@ -375,7 +363,7 @@ class Status(TestCase):
         self.assertEqual(activity["content"], "<p>test content</p>")
         self.assertEqual(activity["inReplyToBook"], self.book.remote_id)
 
-    def test_review_to_pure_activity(self, *_):
+    def test_review_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Review.objects.create(
             name="Review's name",
@@ -399,7 +387,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_review_to_pure_activity_no_rating(self, *_):
+    def test_review_to_pure_activity_no_rating(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.Review.objects.create(
             name="Review name",
@@ -422,7 +410,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_reviewrating_to_pure_activity(self, *_):
+    def test_reviewrating_to_pure_activity(self):
         """subclass of the base model version with a "pure" serializer"""
         status = models.ReviewRating.objects.create(
             rating=3.0,
@@ -443,7 +431,7 @@ class Status(TestCase):
         )
         self.assertEqual(activity["attachment"][0]["name"], "Test Edition")
 
-    def test_favorite(self, *_):
+    def test_favorite(self):
         """fav a status"""
         status = models.Status.objects.create(
             content="test content", user=self.local_user
@@ -464,7 +452,7 @@ class Status(TestCase):
         self.assertEqual(activity["actor"], self.local_user.remote_id)
         self.assertEqual(activity["object"], status.remote_id)
 
-    def test_boost(self, *_):
+    def test_boost(self):
         """boosting, this one's a bit fussy"""
         status = models.Status.objects.create(
             content="test content", user=self.local_user
@@ -476,7 +464,8 @@ class Status(TestCase):
         self.assertEqual(activity["type"], "Announce")
         self.assertEqual(activity, boost.to_activity(pure=True))
 
-    def test_create_broadcast(self, one, two, broadcast_mock, *_):
+    @patch("bookwyrm.models.Status.broadcast")
+    def test_create_broadcast(self, broadcast_mock):
         """should send out two versions of a status on create"""
         models.Comment.objects.create(
             content="hi", user=self.local_user, book=self.book
@@ -496,7 +485,7 @@ class Status(TestCase):
         self.assertEqual(args["type"], "Create")
         self.assertEqual(args["object"]["type"], "Comment")
 
-    def test_recipients_with_mentions(self, *_):
+    def test_recipients_with_mentions(self):
         """get recipients to broadcast a status"""
         status = models.GeneratedNote.objects.create(
             content="test content", user=self.local_user
@@ -505,7 +494,7 @@ class Status(TestCase):
 
         self.assertEqual(status.recipients, [self.remote_user])
 
-    def test_recipients_with_reply_parent(self, *_):
+    def test_recipients_with_reply_parent(self):
         """get recipients to broadcast a status"""
         parent_status = models.GeneratedNote.objects.create(
             content="test content", user=self.remote_user
@@ -516,7 +505,7 @@ class Status(TestCase):
 
         self.assertEqual(status.recipients, [self.remote_user])
 
-    def test_recipients_with_reply_parent_and_mentions(self, *_):
+    def test_recipients_with_reply_parent_and_mentions(self):
         """get recipients to broadcast a status"""
         parent_status = models.GeneratedNote.objects.create(
             content="test content", user=self.remote_user
@@ -529,7 +518,7 @@ class Status(TestCase):
         self.assertEqual(status.recipients, [self.remote_user])
 
     @responses.activate
-    def test_ignore_activity_boost(self, *_):
+    def test_ignore_activity_boost(self):
         """don't bother with most remote statuses"""
         responses.add(responses.GET, "http://fish.com/nothing")
 
@@ -546,7 +535,7 @@ class Status(TestCase):
 
         self.assertTrue(models.Status.ignore_activity(activity))
 
-    def test_raise_visible_to_user_public(self, *_):
+    def test_raise_visible_to_user_public(self):
         """privacy settings"""
         status = models.Status.objects.create(
             content="bleh", user=self.local_user, privacy="public"
@@ -555,7 +544,7 @@ class Status(TestCase):
         self.assertIsNone(status.raise_visible_to_user(self.local_user))
         self.assertIsNone(status.raise_visible_to_user(self.anonymous_user))
 
-    def test_raise_visible_to_user_unlisted(self, *_):
+    def test_raise_visible_to_user_unlisted(self):
         """privacy settings"""
         status = models.Status.objects.create(
             content="bleh", user=self.local_user, privacy="unlisted"
@@ -564,8 +553,7 @@ class Status(TestCase):
         self.assertIsNone(status.raise_visible_to_user(self.local_user))
         self.assertIsNone(status.raise_visible_to_user(self.anonymous_user))
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    def test_raise_visible_to_user_followers(self, *_):
+    def test_raise_visible_to_user_followers(self):
         """privacy settings"""
         status = models.Status.objects.create(
             content="bleh", user=self.local_user, privacy="followers"
@@ -579,7 +567,7 @@ class Status(TestCase):
         self.local_user.followers.add(self.remote_user)
         self.assertIsNone(status.raise_visible_to_user(self.remote_user))
 
-    def test_raise_visible_to_user_followers_mentioned(self, *_):
+    def test_raise_visible_to_user_followers_mentioned(self):
         """privacy settings"""
         status = models.Status.objects.create(
             content="bleh", user=self.local_user, privacy="followers"
@@ -587,8 +575,7 @@ class Status(TestCase):
         status.mention_users.set([self.remote_user])
         self.assertIsNone(status.raise_visible_to_user(self.remote_user))
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    def test_raise_visible_to_user_direct(self, *_):
+    def test_raise_visible_to_user_direct(self):
         """privacy settings"""
         status = models.Status.objects.create(
             content="bleh", user=self.local_user, privacy="direct"

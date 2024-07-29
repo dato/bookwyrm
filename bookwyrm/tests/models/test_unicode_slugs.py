@@ -1,7 +1,7 @@
 """Test Unicode slug generation and URL routing"""
 
 import re
-from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils.text import slugify
 
@@ -15,19 +15,13 @@ class UnicodeSlugTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "testuser",
-                "test@example.com",
-                "password",
-                local=True,
-                localname="testuser",
-            )
-        models.SiteSettings.objects.create()
+        cls.local_user = models.User.objects.create_user(
+            "testuser",
+            "test@example.com",
+            "password",
+            local=True,
+            localname="testuser",
+        )
 
     def test_unicode_characters_in_slug_generation(self):
         """Test that Unicode characters are preserved in slugs"""

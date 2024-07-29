@@ -37,29 +37,25 @@ from bookwyrm.models.housekeeping import delete_user_export_file_task
 class TestCleanUpExportFiles(TestCase):
     """export and import files should be deleted periodically"""
 
-    def setUp(self):
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            self.user = User.objects.create_user(
-                f"mouse@{DOMAIN}",
-                "mouse@mouse.mouse",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                name="hi",
-                summary="a summary",
-                bookwyrm_user=False,
-            )
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            f"mouse@{DOMAIN}",
+            "mouse@mouse.mouse",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            name="hi",
+            summary="a summary",
+            bookwyrm_user=False,
+        )
 
-            expiry_date = datetime.now(timezone.utc) - timedelta(hours=2)
-            self.job = CleanUpUserExportFilesJob.objects.create(
-                user=self.user, expiry_date=expiry_date
-            )
+        expiry_date = datetime.now(timezone.utc) - timedelta(hours=2)
+        cls.job = CleanUpUserExportFilesJob.objects.create(
+            user=cls.user, expiry_date=expiry_date
+        )
 
-            SiteSettings.objects.create()
+        SiteSettings.objects.create()
 
     def test_export_file_deleted(self, *_):
         """did the file actually get deleted?"""
@@ -242,9 +238,7 @@ class Covers(TestCase):
         """create a job and add coverless editions to it"""
 
         self.assertEqual(FindMissingCoversJob.objects.count(), 0)
-
-        with patch("bookwyrm.models.housekeeping.get_missing_cover_task.delay"):
-            run_missing_covers_job(user_id=self.user.id)
+        run_missing_covers_job(user_id=self.user.id)
 
         self.assertEqual(FindMissingCoversJob.objects.count(), 1)
         job = FindMissingCoversJob.objects.first()
@@ -259,9 +253,7 @@ class Covers(TestCase):
             self.second_edition.save(update_fields=["cover"])
 
             self.assertEqual(FindMissingCoversJob.objects.count(), 0)
-
-            with patch("bookwyrm.models.housekeeping.get_missing_cover_task.delay"):
-                run_missing_covers_job(user_id=self.user.id, type="wrong_path")
+            run_missing_covers_job(user_id=self.user.id, type="wrong_path")
 
             self.assertEqual(FindMissingCoversJob.objects.count(), 1)
             edition = FindMissingCoversJob.objects.first().editions.first()
