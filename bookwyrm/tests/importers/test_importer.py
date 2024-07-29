@@ -18,9 +18,6 @@ def make_date(*args):
     return datetime.datetime(*args, tzinfo=datetime.timezone.utc)
 
 
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
 class GenericImporter(TestCase):
     """importing from csv"""
 
@@ -38,14 +35,9 @@ class GenericImporter(TestCase):
     @classmethod
     def setUpTestData(cls):
         """populate database"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True
+        )
         models.SiteSettings.objects.create()
         work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
@@ -54,7 +46,7 @@ class GenericImporter(TestCase):
             parent_work=work,
         )
 
-    def test_create_job(self, *_):
+    def test_create_job(self):
         """creates the import job entry and checks csv"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "public"
@@ -85,7 +77,7 @@ class GenericImporter(TestCase):
         self.assertEqual(import_items[3].normalized_data["id"], "10")
         self.assertEqual(import_items[3].normalized_data["title"], "Patisserie at Home")
 
-    def test_create_retry_job(self, *_):
+    def test_create_retry_job(self):
         """trying again with items that didn't import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
@@ -107,27 +99,29 @@ class GenericImporter(TestCase):
         self.assertEqual(retry_items[1].index, 1)
         self.assertEqual(retry_items[1].normalized_data["id"], "48")
 
-    def test_start_import(self, *_):
+    def test_start_import(self):
         """check that a task was created"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
         )
         MockTask = namedtuple("Task", ("id"))
+
         with patch("bookwyrm.models.import_job.start_import_task.delay") as mock:
             mock.return_value = MockTask(123)
             import_job.start_job()
+
         self.assertEqual(mock.call_count, 1)
         import_job.refresh_from_db()
         self.assertEqual(import_job.task_id, "123")
 
     @responses.activate
-    def test_start_import_task(self, *_):
+    def test_start_import_task(self):
         """resolve entry"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
         )
-
         MockTask = namedtuple("Task", ("id"))
+
         with patch("bookwyrm.models.import_job.import_item_task.delay") as mock:
             mock.return_value = MockTask(123)
             start_import_task(import_job.id)
@@ -135,27 +129,29 @@ class GenericImporter(TestCase):
         self.assertEqual(mock.call_count, 4)
 
     @responses.activate
-    def test_import_item_task(self, *_):
+    def test_import_item_task(self):
         """resolve entry"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
         )
-
         import_item = models.ImportItem.objects.get(job=import_job, index=0)
-        with patch(
-            "bookwyrm.models.import_job.ImportItem.get_book_from_identifier"
-        ) as resolve:
-            resolve.return_value = self.book
 
-            with patch(
+        with (
+            patch(
+                "bookwyrm.models.import_job.ImportItem.get_book_from_identifier"
+            ) as resolve,
+            patch(
                 "bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"
-            ) as mock:
-                import_item_task(import_item.id)
-                kwargs = mock.call_args.kwargs
+            ) as mock,
+        ):
+            resolve.return_value = self.book
+            import_item_task(import_item.id)
+            kwargs = mock.call_args.kwargs
+
         self.assertEqual(kwargs["queue"], "import_triggered")
         import_item.refresh_from_db()
 
-    def test_complete_job(self, *_):
+    def test_complete_job(self):
         """test notification"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
@@ -187,7 +183,7 @@ class GenericImporter(TestCase):
             ).exists()
         )
 
-    def test_handle_imported_book(self, *_):
+    def test_handle_imported_book(self):
         """import added a book, this adds related connections"""
         shelf = self.local_user.shelf_set.filter(
             identifier=models.Shelf.READ_FINISHED
@@ -201,25 +197,22 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         shelf.refresh_from_db()
         self.assertEqual(shelf.books.first(), self.book)
 
-    def test_handle_imported_book_already_shelved(self, *_):
+    def test_handle_imported_book_already_shelved(self):
         """import added a book, this adds related connections"""
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            shelf = self.local_user.shelf_set.filter(
-                identifier=models.Shelf.TO_READ
-            ).first()
-            models.ShelfBook.objects.create(
-                shelf=shelf,
-                user=self.local_user,
-                book=self.book,
-                shelved_date=make_date(2020, 2, 2),
-            )
-
+        shelf = self.local_user.shelf_set.filter(
+            identifier=models.Shelf.TO_READ
+        ).first()
+        models.ShelfBook.objects.create(
+            shelf=shelf,
+            user=self.local_user,
+            book=self.book,
+            shelved_date=make_date(2020, 2, 2),
+        )
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "public"
         )
@@ -227,8 +220,7 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         shelf.refresh_from_db()
         self.assertEqual(shelf.books.first(), self.book)
@@ -241,7 +233,7 @@ class GenericImporter(TestCase):
             ).books.first()
         )
 
-    def test_handle_import_twice(self, *_):
+    def test_handle_import_twice(self):
         """re-importing books"""
         shelf = self.local_user.shelf_set.filter(
             identifier=models.Shelf.READ_FINISHED
@@ -253,16 +245,14 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         shelf.refresh_from_db()
         self.assertEqual(shelf.books.first(), self.book)
         self.assertEqual(models.ReadThrough.objects.count(), 1)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_handle_imported_book_review(self, *_):
+    def test_handle_imported_book_review(self):
         """review import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, True, "unlisted"
@@ -271,11 +261,9 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.models.Status.broadcast") as broadcast_mock,
-        ):
+        with patch("bookwyrm.models.Status.broadcast") as broadcast_mock:
             handle_imported_book(import_item)
+
         kwargs = broadcast_mock.call_args.kwargs
         self.assertEqual(kwargs["software"], "bookwyrm")
         review = models.Review.objects.get(book=self.book, user=self.local_user)
@@ -286,8 +274,7 @@ class GenericImporter(TestCase):
         import_item.refresh_from_db()
         self.assertEqual(import_item.linked_review, review)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_handle_imported_book_rating(self, *_):
+    def test_handle_imported_book_rating(self):
         """rating import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, True, "unlisted"
@@ -296,29 +283,7 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
-        review = models.ReviewRating.objects.get(book=self.book, user=self.local_user)
-        self.assertIsInstance(review, models.ReviewRating)
-        self.assertEqual(review.rating, 3.0)
-        self.assertEqual(review.privacy, "unlisted")
-
-        import_item.refresh_from_db()
-        self.assertEqual(import_item.linked_review.id, review.id)
-
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_handle_imported_book_rating_duplicate_with_link(self, *_):
-        """rating import twice"""
-        import_job = self.importer.create_job(
-            self.local_user, self.csv, True, "unlisted"
-        )
-        import_item = import_job.items.filter(index=1).first()
-        import_item.book = self.book
-        import_item.save()
-
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         review = models.ReviewRating.objects.get(book=self.book, user=self.local_user)
         self.assertIsInstance(review, models.ReviewRating)
@@ -328,8 +293,7 @@ class GenericImporter(TestCase):
         import_item.refresh_from_db()
         self.assertEqual(import_item.linked_review.id, review.id)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_handle_imported_book_rating_duplicate_without_link(self, *_):
+    def test_handle_imported_book_rating_duplicate_with_link(self):
         """rating import twice"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, True, "unlisted"
@@ -338,14 +302,33 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
+        handle_imported_book(import_item)
+
+        review = models.ReviewRating.objects.get(book=self.book, user=self.local_user)
+        self.assertIsInstance(review, models.ReviewRating)
+        self.assertEqual(review.rating, 3.0)
+        self.assertEqual(review.privacy, "unlisted")
+
+        import_item.refresh_from_db()
+        self.assertEqual(import_item.linked_review.id, review.id)
+
+    def test_handle_imported_book_rating_duplicate_without_link(self):
+        """rating import twice"""
+        import_job = self.importer.create_job(
+            self.local_user, self.csv, True, "unlisted"
+        )
+        import_item = import_job.items.filter(index=1).first()
+        import_item.book = self.book
+        import_item.save()
+
+        handle_imported_book(import_item)
+
         import_item.refresh_from_db()
         import_item.linked_review = None
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         review = models.ReviewRating.objects.get(book=self.book, user=self.local_user)
         self.assertIsInstance(review, models.ReviewRating)
@@ -355,7 +338,7 @@ class GenericImporter(TestCase):
         import_item.refresh_from_db()
         self.assertEqual(import_item.linked_review.id, review.id)
 
-    def test_handle_imported_book_reviews_disabled(self, *_):
+    def test_handle_imported_book_reviews_disabled(self):
         """review import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
@@ -364,13 +347,13 @@ class GenericImporter(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
+
         self.assertFalse(
             models.Review.objects.filter(book=self.book, user=self.local_user).exists()
         )
 
-    def test_import_limit(self, *_):
+    def test_import_limit(self):
         """checks if import limit works"""
         site_settings = models.SiteSettings.objects.get()
         site_settings.import_size_limit = 2
