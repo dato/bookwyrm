@@ -1,6 +1,4 @@
 """ style fixes and lookups for templates """
-from unittest.mock import patch
-
 from django.test import TestCase
 from django.test.client import RequestFactory
 
@@ -8,36 +6,26 @@ from bookwyrm import models
 from bookwyrm.templatetags import shelf_tags
 
 
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.activitystreams.remove_status_task.delay")
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
 class ShelfTags(TestCase):
     """lotta different things here"""
 
     @classmethod
     def setUpTestData(cls):
         """create some filler objects"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.mouse",
-                "mouseword",
-                local=True,
-                localname="mouse",
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.rat",
-                "ratword",
-                remote_id="http://example.com/rat",
-                local=False,
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.mouse",
+            "mouseword",
+            local=True,
+            localname="mouse",
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.rat",
+            "ratword",
+            remote_id="http://example.com/rat",
+            local=False,
+        )
         cls.book = models.Edition.objects.create(
             title="Test Book",
             parent_work=models.Work.objects.create(title="Test work"),
@@ -47,7 +35,7 @@ class ShelfTags(TestCase):
         """test data"""
         self.factory = RequestFactory()
 
-    def test_get_is_book_on_shelf(self, *_):
+    def test_get_is_book_on_shelf(self):
         """check if a book is on a shelf"""
         shelf = self.local_user.shelf_set.first()
         self.assertFalse(shelf_tags.get_is_book_on_shelf(self.book, shelf))
@@ -56,14 +44,14 @@ class ShelfTags(TestCase):
         )
         self.assertTrue(shelf_tags.get_is_book_on_shelf(self.book, shelf))
 
-    def test_get_next_shelf(self, *_):
+    def test_get_next_shelf(self):
         """self progress helper"""
         self.assertEqual(shelf_tags.get_next_shelf("to-read"), "reading")
         self.assertEqual(shelf_tags.get_next_shelf("reading"), "read")
         self.assertEqual(shelf_tags.get_next_shelf("read"), "complete")
         self.assertEqual(shelf_tags.get_next_shelf("blooooga"), "to-read")
 
-    def test_active_shelf(self, *_):
+    def test_active_shelf(self):
         """get the shelf a book is on"""
         shelf = self.local_user.shelf_set.first()
         request = self.factory.get("")

@@ -1,6 +1,5 @@
 """ testing models """
 from datetime import timedelta
-from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.test import TestCase
@@ -15,19 +14,14 @@ class SiteModels(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
 
     def test_site_settings_absent(self):
         """create and load site settings"""
@@ -97,11 +91,7 @@ class SiteModels(TestCase):
         self.assertTrue(token.valid())
         self.assertEqual(token.link, f"{settings.BASE_URL}/password-reset/hello")
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    @patch("bookwyrm.lists_stream.populate_lists_task.delay")
-    def test_change_confirmation_scheme(self, *_):
+    def test_change_confirmation_scheme(self):
         """Switch from requiring email confirmation to not"""
         site = models.SiteSettings.objects.create(
             id=1, name="Fish Town", require_confirm_email=True

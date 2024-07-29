@@ -1,6 +1,5 @@
 """ testing models """
 import datetime
-from unittest.mock import patch
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -14,15 +13,9 @@ class ReadThrough(TestCase):
     @classmethod
     def setUpTestData(cls):
         """look, a shelf"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
-            )
-
+        cls.user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
+        )
         cls.work = models.Work.objects.create(title="Example Work")
         cls.edition = models.Edition.objects.create(
             title="Example Edition", parent_work=cls.work

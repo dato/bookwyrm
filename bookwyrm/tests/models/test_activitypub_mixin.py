@@ -21,34 +21,26 @@ from bookwyrm.settings import PAGE_LENGTH
 
 
 # pylint: disable=too-many-public-methods
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
 class ActivitypubMixins(TestCase):
     """functionality shared across models"""
 
     @classmethod
     def setUpTestData(cls):
         """shared data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.com", "mouseword", local=True, localname="mouse"
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.com", "mouseword", local=True, localname="mouse"
+        )
         cls.local_user.remote_id = "http://example.com/a/b"
         cls.local_user.save(broadcast=False, update_fields=["remote_id"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
 
     def setUp(self):
         """test data"""
@@ -61,7 +53,7 @@ class ActivitypubMixins(TestCase):
             "published": "2020-12-04T17:52:22.623807+00:00",
         }
 
-    def test_to_activity(self, *_):
+    def test_to_activity(self):
         """model to ActivityPub json"""
 
         @dataclass(init=False)
@@ -82,7 +74,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(activity["id"], "https://www.example.com/test")
         self.assertEqual(activity["type"], "Test")
 
-    def test_find_existing_by_remote_id(self, *_):
+    def test_find_existing_by_remote_id(self):
         """attempt to match a remote id to an object in the db"""
         # uses a different remote id scheme
         # this isn't really part of this test directly but it's helpful to state
@@ -114,7 +106,7 @@ class ActivitypubMixins(TestCase):
         # test subclass match
         result = models.Status.find_existing_by_remote_id("https://comment.net")
 
-    def test_find_existing(self, *_):
+    def test_find_existing(self):
         """match a blob of data to a model"""
         book = models.Edition.objects.create(
             title="Test edition",
@@ -124,14 +116,14 @@ class ActivitypubMixins(TestCase):
         result = models.Edition.find_existing({"openlibraryKey": "OL1234"})
         self.assertEqual(result, book)
 
-    def test_find_existing_with_id(self, *_):
+    def test_find_existing_with_id(self):
         """make sure that an "id" field won't produce a match"""
         book = models.Edition.objects.create(title="Test edition")
 
         result = models.Edition.find_existing({"id": book.id})
         self.assertIsNone(result)
 
-    def test_find_existing_with_id_and_match(self, *_):
+    def test_find_existing_with_id_and_match(self):
         """make sure that an "id" field won't produce a match"""
         book = models.Edition.objects.create(title="Test edition")
         matching_book = models.Edition.objects.create(
@@ -143,7 +135,7 @@ class ActivitypubMixins(TestCase):
         )
         self.assertEqual(result, matching_book)
 
-    def test_get_recipients_public_object(self, *_):
+    def test_get_recipients_public_object(self):
         """determines the recipients for an object's broadcast"""
         MockSelf = namedtuple("Self", ("privacy"))
         mock_self = MockSelf("public")
@@ -151,7 +143,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(len(recipients), 1)
         self.assertEqual(recipients[0], self.remote_user.inbox)
 
-    def test_get_recipients_public_user_object_no_followers(self, *_):
+    def test_get_recipients_public_user_object_no_followers(self):
         """determines the recipients for a user's object broadcast"""
         MockSelf = namedtuple("Self", ("privacy", "user"))
         mock_self = MockSelf("public", self.local_user)
@@ -159,7 +151,7 @@ class ActivitypubMixins(TestCase):
         recipients = ActivitypubMixin.get_recipients(mock_self)
         self.assertEqual(len(recipients), 0)
 
-    def test_get_recipients_public_user_object(self, *_):
+    def test_get_recipients_public_user_object(self):
         """determines the recipients for a user's object broadcast"""
         MockSelf = namedtuple("Self", ("privacy", "user"))
         mock_self = MockSelf("public", self.local_user)
@@ -169,21 +161,20 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(len(recipients), 1)
         self.assertEqual(recipients[0], self.remote_user.inbox)
 
-    def test_get_recipients_public_user_object_with_mention(self, *_):
+    def test_get_recipients_public_user_object_with_mention(self):
         """determines the recipients for a user's object broadcast"""
         MockSelf = namedtuple("Self", ("privacy", "user"))
         mock_self = MockSelf("public", self.local_user)
         self.local_user.followers.add(self.remote_user)
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            another_remote_user = models.User.objects.create_user(
-                "nutria",
-                "nutria@nutria.com",
-                "nutriaword",
-                local=False,
-                remote_id="https://example.com/users/nutria",
-                inbox="https://example.com/users/nutria/inbox",
-                outbox="https://example.com/users/nutria/outbox",
-            )
+        another_remote_user = models.User.objects.create_user(
+            "nutria",
+            "nutria@nutria.com",
+            "nutriaword",
+            local=False,
+            remote_id="https://example.com/users/nutria",
+            inbox="https://example.com/users/nutria/inbox",
+            outbox="https://example.com/users/nutria/outbox",
+        )
         MockSelf = namedtuple("Self", ("privacy", "user", "recipients"))
         mock_self = MockSelf("public", self.local_user, [another_remote_user])
 
@@ -192,21 +183,20 @@ class ActivitypubMixins(TestCase):
         self.assertTrue(another_remote_user.inbox in recipients)
         self.assertTrue(self.remote_user.inbox in recipients)
 
-    def test_get_recipients_direct(self, *_):
+    def test_get_recipients_direct(self):
         """determines the recipients for a user's object broadcast"""
         MockSelf = namedtuple("Self", ("privacy", "user"))
         mock_self = MockSelf("public", self.local_user)
         self.local_user.followers.add(self.remote_user)
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            another_remote_user = models.User.objects.create_user(
-                "nutria",
-                "nutria@nutria.com",
-                "nutriaword",
-                local=False,
-                remote_id="https://example.com/users/nutria",
-                inbox="https://example.com/users/nutria/inbox",
-                outbox="https://example.com/users/nutria/outbox",
-            )
+        another_remote_user = models.User.objects.create_user(
+            "nutria",
+            "nutria@nutria.com",
+            "nutriaword",
+            local=False,
+            remote_id="https://example.com/users/nutria",
+            inbox="https://example.com/users/nutria/inbox",
+            outbox="https://example.com/users/nutria/outbox",
+        )
         MockSelf = namedtuple("Self", ("privacy", "user", "recipients"))
         mock_self = MockSelf("direct", self.local_user, [another_remote_user])
 
@@ -214,21 +204,20 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(len(recipients), 1)
         self.assertEqual(recipients[0], another_remote_user.inbox)
 
-    def test_get_recipients_combine_inboxes(self, *_):
+    def test_get_recipients_combine_inboxes(self):
         """should combine users with the same shared_inbox"""
         self.remote_user.shared_inbox = "http://example.com/inbox"
         self.remote_user.save(broadcast=False, update_fields=["shared_inbox"])
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            another_remote_user = models.User.objects.create_user(
-                "nutria",
-                "nutria@nutria.com",
-                "nutriaword",
-                local=False,
-                remote_id="https://example.com/users/nutria",
-                inbox="https://example.com/users/nutria/inbox",
-                shared_inbox="http://example.com/inbox",
-                outbox="https://example.com/users/nutria/outbox",
-            )
+        another_remote_user = models.User.objects.create_user(
+            "nutria",
+            "nutria@nutria.com",
+            "nutriaword",
+            local=False,
+            remote_id="https://example.com/users/nutria",
+            inbox="https://example.com/users/nutria/inbox",
+            shared_inbox="http://example.com/inbox",
+            outbox="https://example.com/users/nutria/outbox",
+        )
         MockSelf = namedtuple("Self", ("privacy", "user", "recipients"))
         self.local_user.followers.add(self.remote_user)
         self.local_user.followers.add(another_remote_user)
@@ -242,19 +231,18 @@ class ActivitypubMixins(TestCase):
         recipients = ActivitypubMixin.get_recipients(mock_self)
         self.assertCountEqual(recipients, ["http://example.com/inbox"])
 
-    def test_get_recipients_software(self, *_):
+    def test_get_recipients_software(self):
         """should differentiate between bookwyrm and other remote users"""
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            another_remote_user = models.User.objects.create_user(
-                "nutria",
-                "nutria@nutria.com",
-                "nutriaword",
-                local=False,
-                remote_id="https://example.com/users/nutria",
-                inbox="https://example.com/users/nutria/inbox",
-                outbox="https://example.com/users/nutria/outbox",
-                bookwyrm_user=False,
-            )
+        another_remote_user = models.User.objects.create_user(
+            "nutria",
+            "nutria@nutria.com",
+            "nutriaword",
+            local=False,
+            remote_id="https://example.com/users/nutria",
+            inbox="https://example.com/users/nutria/inbox",
+            outbox="https://example.com/users/nutria/outbox",
+            bookwyrm_user=False,
+        )
         MockSelf = namedtuple("Self", ("privacy", "user"))
         mock_self = MockSelf("public", self.local_user)
         self.local_user.followers.add(self.remote_user)
@@ -272,7 +260,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(recipients[0], another_remote_user.inbox)
 
     # ObjectMixin
-    def test_object_save_create(self, *_):
+    def test_object_save_create(self):
         """should save uneventfully when broadcast is disabled"""
 
         class Success(Exception):
@@ -303,7 +291,7 @@ class ActivitypubMixins(TestCase):
         ObjectModel(user=self.local_user).save(broadcast=False)
         ObjectModel(user=None).save()
 
-    def test_object_save_update(self, *_):
+    def test_object_save_update(self):
         """should save uneventfully when broadcast is disabled"""
 
         class Success(Exception):
@@ -329,7 +317,7 @@ class ActivitypubMixins(TestCase):
         with self.assertRaises(Success):
             UpdateObjectModel(id=1, last_edited_by=self.local_user).save()
 
-    def test_object_save_delete(self, *_):
+    def test_object_save_delete(self):
         """should create delete activities when objects are deleted by flag"""
 
         class ActivitySuccess(Exception):
@@ -351,7 +339,7 @@ class ActivitypubMixins(TestCase):
         with self.assertRaises(ActivitySuccess):
             DeletableObjectModel(id=1, user=self.local_user, deleted=True).save()
 
-    def test_to_delete_activity(self, *_):
+    def test_to_delete_activity(self):
         """wrapper for Delete activity"""
         MockSelf = namedtuple("Self", ("remote_id", "to_activity"))
         mock_self = MockSelf(
@@ -366,7 +354,7 @@ class ActivitypubMixins(TestCase):
             activity["cc"], ["https://www.w3.org/ns/activitystreams#Public"]
         )
 
-    def test_to_update_activity(self, *_):
+    def test_to_update_activity(self):
         """ditto above but for Update"""
         MockSelf = namedtuple("Self", ("remote_id", "to_activity"))
         mock_self = MockSelf(
@@ -383,7 +371,7 @@ class ActivitypubMixins(TestCase):
         )
         self.assertIsInstance(activity["object"], dict)
 
-    def test_to_undo_activity(self, *_):
+    def test_to_undo_activity(self):
         """and again, for Undo"""
         MockSelf = namedtuple("Self", ("remote_id", "to_activity", "user"))
         mock_self = MockSelf(
@@ -397,7 +385,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(activity["type"], "Undo")
         self.assertIsInstance(activity["object"], dict)
 
-    def test_to_ordered_collection_page(self, *_):
+    def test_to_ordered_collection_page(self):
         """make sure the paged results of an ordered collection work"""
         self.assertEqual(PAGE_LENGTH, 15)
         models.Status.objects.bulk_create(
@@ -424,7 +412,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(page_2.orderedItems[0]["content"], "<p>test status 14</p>")
         self.assertEqual(page_2.orderedItems[-1]["content"], "<p>test status 0</p>")
 
-    def test_to_ordered_collection(self, *_):
+    def test_to_ordered_collection(self):
         """convert a queryset into an ordered collection object"""
         self.assertEqual(PAGE_LENGTH, 15)
         models.Status.objects.bulk_create(
@@ -453,7 +441,7 @@ class ActivitypubMixins(TestCase):
         self.assertEqual(page_2.orderedItems[0]["content"], "<p>test status 14</p>")
         self.assertEqual(page_2.orderedItems[-1]["content"], "<p>test status 0</p>")
 
-    def test_broadcast_task(self, *_):
+    def test_broadcast_task(self):
         """Should be calling asyncio"""
         recipients = [
             "https://instance.example/user/inbox",

@@ -1,5 +1,4 @@
 """ testing models """
-from unittest.mock import patch
 from django.test import TestCase
 from bookwyrm import models
 
@@ -10,27 +9,21 @@ class Notification(TestCase):
     @classmethod
     def setUpTestData(cls):
         """useful things for creating a notification"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
-            )
-            cls.another_user = models.User.objects.create_user(
-                "rat", "rat@rat.rat", "ratword", local=True, localname="rat"
-            )
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.remote_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/users/rat",
-                inbox="https://example.com/users/rat/inbox",
-                outbox="https://example.com/users/rat/outbox",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "mouseword", local=True, localname="mouse"
+        )
+        cls.another_user = models.User.objects.create_user(
+            "rat", "rat@rat.rat", "ratword", local=True, localname="rat"
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/users/rat",
+            inbox="https://example.com/users/rat/inbox",
+            outbox="https://example.com/users/rat/outbox",
+        )
         cls.work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Test Book",
@@ -108,9 +101,7 @@ class Notification(TestCase):
         )
         self.assertFalse(models.Notification.objects.exists())
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.lists_stream.remove_list_task.delay")
-    def test_notify_list_item_own_list(self, *_):
+    def test_notify_list_item_own_list(self):
         """Don't add list item notification for your own list"""
         test_list = models.List.objects.create(user=self.local_user, name="hi")
 
@@ -119,9 +110,7 @@ class Notification(TestCase):
         )
         self.assertFalse(models.Notification.objects.exists())
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.lists_stream.remove_list_task.delay")
-    def test_notify_list_item_remote(self, *_):
+    def test_notify_list_item_remote(self):
         """Don't add list item notification for a remote user"""
         test_list = models.List.objects.create(user=self.remote_user, name="hi")
 
@@ -130,9 +119,7 @@ class Notification(TestCase):
         )
         self.assertFalse(models.Notification.objects.exists())
 
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.lists_stream.remove_list_task.delay")
-    def test_notify_list_item(self, *_):
+    def test_notify_list_item(self):
         """Add list item notification"""
         test_list = models.List.objects.create(user=self.local_user, name="hi")
         list_item = models.ListItem.objects.create(
@@ -203,19 +190,14 @@ class NotifyInviteRequest(TestCase):
     @classmethod
     def setUpTestData(cls):
         """ensure there is one admin"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-                is_superuser=True,
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+            is_superuser=True,
+        )
 
     def test_invite_request_triggers_notification(self):
         """requesting an invite notifies the admin"""
@@ -268,22 +250,17 @@ class NotifyInviteRequest(TestCase):
 
     def test_notify_multiple_admins(self):
         """all admins are notified"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            self.local_user = models.User.objects.create_user(
-                "admin@local.com",
-                "admin@example.com",
-                "password",
-                local=True,
-                localname="root",
-                is_superuser=True,
-            )
-            models.InviteRequest.objects.create(email="user@example.com")
-            admins = models.User.objects.filter(is_superuser=True).all()
-            notifications = models.Notification.objects.all()
+        self.local_user = models.User.objects.create_user(
+            "admin@local.com",
+            "admin@example.com",
+            "password",
+            local=True,
+            localname="root",
+            is_superuser=True,
+        )
+        models.InviteRequest.objects.create(email="user@example.com")
+        admins = models.User.objects.filter(is_superuser=True).all()
+        notifications = models.Notification.objects.all()
 
-            self.assertEqual(len(notifications), 2)
-            self.assertCountEqual([notif.user for notif in notifications], admins)
+        self.assertEqual(len(notifications), 2)
+        self.assertCountEqual([notif.user for notif in notifications], admins)
