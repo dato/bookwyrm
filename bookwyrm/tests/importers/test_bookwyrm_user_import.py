@@ -1,5 +1,4 @@
 """ testing bookwyrm user import """
-from unittest.mock import patch
 from django.test import TestCase
 from bookwyrm import models
 from bookwyrm.importers import BookwyrmImporter
@@ -10,15 +9,9 @@ class BookwyrmUserImport(TestCase):
 
     def setUp(self):
         """setting stuff up"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-        ):
-            self.user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True, localname="mouse"
-            )
+        self.user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True, localname="mouse"
+        )
 
     def test_create_retry_job(self):
         """test retrying a user import"""
