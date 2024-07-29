@@ -3,7 +3,6 @@ import datetime
 import json
 import pathlib
 
-from unittest.mock import patch
 
 from django.utils import timezone
 from django.test import TestCase
@@ -16,165 +15,152 @@ class BookwyrmExportJob(TestCase):
     """testing user export functions"""
 
     @classmethod
-    def setUpTestData(self):  # pylint: disable=bad-classmethod-argument
+    def setUpTestData(cls):
         """lots of stuff to set up for a user export"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.activitystreams.add_book_statuses_task"),
-        ):
+        cls.local_user = models.User.objects.create_user(
+            "mouse",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+            name="Mouse",
+            summary="I'm a real bookmouse",
+            manually_approves_followers=False,
+            hide_follows=False,
+            show_goal=False,
+            show_suggested_users=False,
+            discoverable=True,
+            preferred_timezone="America/Los Angeles",
+            default_post_privacy="followers",
+        )
+        avatar_path = pathlib.Path(__file__).parent.joinpath(
+            "../../static/images/default_avi.jpg"
+        )
+        with open(avatar_path, "rb") as avatar_file:
+            cls.local_user.avatar.save("mouse-avatar.jpg", avatar_file)
 
-            self.local_user = models.User.objects.create_user(
-                "mouse",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-                name="Mouse",
-                summary="I'm a real bookmouse",
-                manually_approves_followers=False,
-                hide_follows=False,
-                show_goal=False,
-                show_suggested_users=False,
-                discoverable=True,
-                preferred_timezone="America/Los Angeles",
-                default_post_privacy="followers",
-            )
-            avatar_path = pathlib.Path(__file__).parent.joinpath(
-                "../../static/images/default_avi.jpg"
-            )
-            with open(avatar_path, "rb") as avatar_file:
-                self.local_user.avatar.save("mouse-avatar.jpg", avatar_file)
+        cls.rat_user = models.User.objects.create_user(
+            "rat", "rat@rat.rat", "ratword", local=True, localname="rat"
+        )
 
-            self.rat_user = models.User.objects.create_user(
-                "rat", "rat@rat.rat", "ratword", local=True, localname="rat"
-            )
+        cls.badger_user = models.User.objects.create_user(
+            "badger",
+            "badger@badger.badger",
+            "badgerword",
+            local=True,
+            localname="badger",
+        )
 
-            self.badger_user = models.User.objects.create_user(
-                "badger",
-                "badger@badger.badger",
-                "badgerword",
-                local=True,
-                localname="badger",
-            )
+        models.AnnualGoal.objects.create(
+            user=cls.local_user,
+            year=timezone.now().year,
+            goal=128937123,
+            privacy="followers",
+        )
 
-            models.AnnualGoal.objects.create(
-                user=self.local_user,
-                year=timezone.now().year,
-                goal=128937123,
-                privacy="followers",
-            )
+        cls.list = models.List.objects.create(
+            name="My excellent list",
+            user=cls.local_user,
+            remote_id="https://local.lists/1111",
+        )
 
-            self.list = models.List.objects.create(
-                name="My excellent list",
-                user=self.local_user,
-                remote_id="https://local.lists/1111",
-            )
+        cls.saved_list = models.List.objects.create(
+            name="My cool list",
+            user=cls.rat_user,
+            remote_id="https://local.lists/9999",
+        )
 
-            self.saved_list = models.List.objects.create(
-                name="My cool list",
-                user=self.rat_user,
-                remote_id="https://local.lists/9999",
-            )
+        cls.local_user.saved_lists.add(cls.saved_list)
+        cls.local_user.blocks.add(cls.badger_user)
+        cls.rat_user.followers.add(cls.local_user)
 
-            self.local_user.saved_lists.add(self.saved_list)
-            self.local_user.blocks.add(self.badger_user)
-            self.rat_user.followers.add(self.local_user)
+        # book, edition, author
+        cls.author = models.Author.objects.create(name="Sam Zhu")
+        cls.work = models.Work.objects.create(
+            title="Example Work", remote_id="https://example.com/book/1"
+        )
+        cls.edition = models.Edition.objects.create(
+            title="Example Edition", parent_work=cls.work
+        )
 
-            # book, edition, author
-            self.author = models.Author.objects.create(name="Sam Zhu")
-            self.work = models.Work.objects.create(
-                title="Example Work", remote_id="https://example.com/book/1"
-            )
-            self.edition = models.Edition.objects.create(
-                title="Example Edition", parent_work=self.work
-            )
+        # edition cover
+        cover_path = pathlib.Path(__file__).parent.joinpath(
+            "../../static/images/default_avi.jpg"
+        )
+        with open(cover_path, "rb") as cover_file:
+            cls.edition.cover.save("tèst.jpg", cover_file)
 
-            # edition cover
-            cover_path = pathlib.Path(__file__).parent.joinpath(
-                "../../static/images/default_avi.jpg"
-            )
-            with open(cover_path, "rb") as cover_file:
-                self.edition.cover.save("tèst.jpg", cover_file)
+        cls.edition.authors.add(cls.author)
 
-            self.edition.authors.add(self.author)
+        # readthrough
+        cls.readthrough_start = timezone.now()
+        finish = cls.readthrough_start + datetime.timedelta(days=1)
+        models.ReadThrough.objects.create(
+            user=cls.local_user,
+            book=cls.edition,
+            start_date=cls.readthrough_start,
+            finish_date=finish,
+        )
 
-            # readthrough
-            self.readthrough_start = timezone.now()
-            finish = self.readthrough_start + datetime.timedelta(days=1)
-            models.ReadThrough.objects.create(
-                user=self.local_user,
-                book=self.edition,
-                start_date=self.readthrough_start,
-                finish_date=finish,
-            )
+        # shelve
+        read_shelf = models.Shelf.objects.get(user=cls.local_user, identifier="read")
+        models.ShelfBook.objects.create(
+            book=cls.edition, shelf=read_shelf, user=cls.local_user
+        )
 
-            # shelve
-            read_shelf = models.Shelf.objects.get(
-                user=self.local_user, identifier="read"
-            )
-            models.ShelfBook.objects.create(
-                book=self.edition, shelf=read_shelf, user=self.local_user
-            )
+        # add to list
+        models.ListItem.objects.create(
+            book_list=cls.list,
+            user=cls.local_user,
+            book=cls.edition,
+            approved=True,
+            order=1,
+        )
 
-            # add to list
-            models.ListItem.objects.create(
-                book_list=self.list,
-                user=self.local_user,
-                book=self.edition,
-                approved=True,
-                order=1,
-            )
+        # review
+        models.Review.objects.create(
+            content="awesome",
+            name="my review",
+            rating=5,
+            user=cls.local_user,
+            book=cls.edition,
+        )
+        # comment
+        models.Comment.objects.create(
+            content="ok so far",
+            user=cls.local_user,
+            book=cls.edition,
+            progress=15,
+        )
+        # deleted comment
+        models.Comment.objects.create(
+            content="so far",
+            user=cls.local_user,
+            book=cls.edition,
+            progress=5,
+            deleted=True,
+        )
+        # quote
+        models.Quotation.objects.create(
+            content="check this out",
+            quote="A rose by any other name",
+            user=cls.local_user,
+            book=cls.edition,
+        )
+        # deleted quote
+        models.Quotation.objects.create(
+            content="check this out",
+            quote="A rose by any other name",
+            user=cls.local_user,
+            book=cls.edition,
+            deleted=True,
+        )
 
-            # review
-            models.Review.objects.create(
-                content="awesome",
-                name="my review",
-                rating=5,
-                user=self.local_user,
-                book=self.edition,
-            )
-            # comment
-            models.Comment.objects.create(
-                content="ok so far",
-                user=self.local_user,
-                book=self.edition,
-                progress=15,
-            )
-            # deleted comment
-            models.Comment.objects.create(
-                content="so far",
-                user=self.local_user,
-                book=self.edition,
-                progress=5,
-                deleted=True,
-            )
-            # quote
-            models.Quotation.objects.create(
-                content="check this out",
-                quote="A rose by any other name",
-                user=self.local_user,
-                book=self.edition,
-            )
-            # deleted quote
-            models.Quotation.objects.create(
-                content="check this out",
-                quote="A rose by any other name",
-                user=self.local_user,
-                book=self.edition,
-                deleted=True,
-            )
+        cls.job = models.BookwyrmExportJob.objects.create(user=cls.local_user)
 
-            self.job = models.BookwyrmExportJob.objects.create(user=self.local_user)
-
-            # run the first stage of the export
-            with patch("bookwyrm.models.bookwyrm_export_job.create_archive_task.delay"):
-                models.bookwyrm_export_job.create_export_json_task(job_id=self.job.id)
-            self.job.refresh_from_db()
+        # run the first stage of the export
+        models.bookwyrm_export_job.create_export_json_task(job_id=cls.job.id)
+        cls.job.refresh_from_db()
 
     def test_add_book_to_user_export_job(self):
         """does AddBookToUserExportJob ...add the book to the export?"""

@@ -1,6 +1,4 @@
 """ testing models """
-from unittest.mock import patch
-
 from django.test import TestCase
 
 from bookwyrm import models
@@ -13,14 +11,9 @@ class TestParentJob(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we're trying to transport user data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True
+        )
 
     def test_complete_job(self):
         """mark a job as complete"""
@@ -62,14 +55,9 @@ class TestChildJob(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we're trying to transport user data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True
+        )
 
     def test_complete_job(self):
         """a child job completed, so its parent is complete"""
