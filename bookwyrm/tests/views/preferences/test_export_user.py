@@ -10,10 +10,10 @@ from bookwyrm.tests.validate_html import validate_html
 class ExportUserViews(TestCase):
     """exporting user data"""
 
-    def setUp(self):
-        self.factory = RequestFactory()
+    @classmethod
+    def setUpTestData(cls):
         models.SiteSettings.objects.create()
-        self.local_user = models.User.objects.create_user(
+        cls.local_user = models.User.objects.create_user(
             "hugh@example.com",
             "hugh@example.com",
             "password",
@@ -23,6 +23,9 @@ class ExportUserViews(TestCase):
             remote_id="https://example.com/users/hugh",
             preferred_timezone="Australia/Broken_Hill",
         )
+
+    def setUp(self):
+        self.factory = RequestFactory()
 
     def test_export_user_get(self, *_):
         """request export"""

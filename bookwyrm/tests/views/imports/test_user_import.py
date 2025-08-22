@@ -13,10 +13,10 @@ from bookwyrm.tests.validate_html import validate_html
 class ImportUserViews(TestCase):
     """user import views"""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         """we need basic test data and mocks"""
-        self.factory = RequestFactory()
-        self.local_user = models.User.objects.create_user(
+        cls.local_user = models.User.objects.create_user(
             "mouse@local.com",
             "mouse@mouse.mouse",
             "password",
@@ -24,6 +24,10 @@ class ImportUserViews(TestCase):
             localname="mouse",
         )
         models.SiteSettings.objects.create()
+
+    def setUp(self):
+        """individual test setup"""
+        self.factory = RequestFactory()
 
     def test_get_user_import_page(self):
         """there are so many views, this just makes sure it LOADS"""
