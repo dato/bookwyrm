@@ -1,6 +1,5 @@
 """ test move functionality """
 import json
-from unittest.mock import patch
 import pathlib
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import TestCase
@@ -10,43 +9,27 @@ import responses
 from bookwyrm import forms, models, views
 
 
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.suggested_users.rerank_user_task.delay")
 class ViewsHelpers(TestCase):
     """viewing and creating statuses"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.com",
-                "ratword",
-                local=True,
-                discoverable=True,
-                localname="rat",
-            )
-
-        with (
-            patch("bookwyrm.models.user.set_remote_server.delay"),
-            patch("bookwyrm.suggested_users.rerank_user_task.delay"),
-        ):
-            cls.remote_user = models.User.objects.create_user(
-                "mouse@example.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=False,
-                remote_id="https://example.com/user/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.com",
+            "ratword",
+            local=True,
+            discoverable=True,
+            localname="rat",
+        )
+        cls.remote_user = models.User.objects.create_user(
+            "mouse@example.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=False,
+            remote_id="https://example.com/user/mouse",
+        )
 
     def setUp(self):
         """individual test setup"""
@@ -58,10 +41,7 @@ class ViewsHelpers(TestCase):
         del self.userdata["icon"]
 
     @responses.activate
-    @patch("bookwyrm.models.user.set_remote_server.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    def test_move_user_view(self, *_):
+    def test_move_user_view(self):
         """move user"""
 
         self.assertEqual(self.remote_user.remote_id, "https://example.com/user/mouse")
@@ -112,10 +92,9 @@ class ViewsHelpers(TestCase):
         middleware.process_request(request)
         request.session.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            view(request)
-            self.local_user.refresh_from_db()
+        view(request)
+        self.local_user.refresh_from_db()
 
-            self.assertEqual(self.local_user.also_known_as.first(), self.remote_user)
-            self.assertEqual(self.remote_user.also_known_as.first(), self.local_user)
-            self.assertEqual(self.local_user.moved_to, "https://example.com/user/mouse")
+        self.assertEqual(self.local_user.also_known_as.first(), self.remote_user)
+        self.assertEqual(self.remote_user.also_known_as.first(), self.local_user)
+        self.assertEqual(self.local_user.moved_to, "https://example.com/user/mouse")

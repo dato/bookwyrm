@@ -1,6 +1,4 @@
 """ test for user export app functionality """
-from unittest.mock import patch
-
 from django.http import HttpResponse
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -12,23 +10,22 @@ from bookwyrm.tests.validate_html import validate_html
 class ExportUserViews(TestCase):
     """exporting user data"""
 
+    @classmethod
+    def setUpTestData(cls):
+        models.SiteSettings.objects.create()
+        cls.local_user = models.User.objects.create_user(
+            "hugh@example.com",
+            "hugh@example.com",
+            "password",
+            local=True,
+            localname="Hugh",
+            summary="just a test account",
+            remote_id="https://example.com/users/hugh",
+            preferred_timezone="Australia/Broken_Hill",
+        )
+
     def setUp(self):
         self.factory = RequestFactory()
-        models.SiteSettings.objects.create()
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-        ):
-            self.local_user = models.User.objects.create_user(
-                "hugh@example.com",
-                "hugh@example.com",
-                "password",
-                local=True,
-                localname="Hugh",
-                summary="just a test account",
-                remote_id="https://example.com/users/hugh",
-                preferred_timezone="Australia/Broken_Hill",
-            )
 
     def test_export_user_get(self, *_):
         """request export"""
@@ -42,8 +39,8 @@ class ExportUserViews(TestCase):
 
         request = self.factory.post("")
         request.user = self.local_user
-        with patch("bookwyrm.models.bookwyrm_export_job.BookwyrmExportJob.start_job"):
-            export = views.ExportUser.as_view()(request)
+
+        export = views.ExportUser.as_view()(request)
         self.assertIsInstance(export, HttpResponse)
         self.assertEqual(export.status_code, 302)
 

@@ -8,32 +8,26 @@ from bookwyrm import forms, models, views
 from bookwyrm.tests.validate_html import validate_html
 
 
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
 class GetStartedViews(TestCase):
     """helping new users get oriented"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.local_user = models.User.objects.create_user(
-                "rat@local.com",
-                "rat@rat.rat",
-                "password",
-                local=True,
-                localname="rat",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.local_user = models.User.objects.create_user(
+            "rat@local.com",
+            "rat@rat.rat",
+            "password",
+            local=True,
+            localname="rat",
+        )
         cls.book = models.Edition.objects.create(
             parent_work=models.Work.objects.create(title="hi"),
             title="Example Edition",
@@ -45,7 +39,7 @@ class GetStartedViews(TestCase):
         """individual test setup"""
         self.factory = RequestFactory()
 
-    def test_profile_view(self, *_):
+    def test_profile_view(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.GetStartedProfile.as_view()
         request = self.factory.get("")
@@ -57,9 +51,7 @@ class GetStartedViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.suggested_users.rerank_user_task.delay")
-    def test_profile_view_post(self, *_):
+    def test_profile_view_post(self):
         """save basic user details"""
         view = views.GetStartedProfile.as_view()
         form = forms.LimitedEditUserForm(instance=self.local_user)
@@ -77,7 +69,7 @@ class GetStartedViews(TestCase):
         self.assertEqual(self.local_user.name, "New Name")
         self.assertTrue(self.local_user.discoverable)
 
-    def test_books_view(self, _):
+    def test_books_view(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.GetStartedBooks.as_view()
         request = self.factory.get("")
@@ -89,7 +81,7 @@ class GetStartedViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    def test_books_view_with_query(self, _):
+    def test_books_view_with_query(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.GetStartedBooks.as_view()
         request = self.factory.get("?query=Example")
@@ -101,9 +93,7 @@ class GetStartedViews(TestCase):
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
-    def test_books_view_post(self, *_):
+    def test_books_view_post(self):
         """shelve some books"""
         view = views.GetStartedBooks.as_view()
         data = {self.book.id: self.local_user.shelf_set.first().id}
@@ -121,20 +111,20 @@ class GetStartedViews(TestCase):
         self.assertEqual(shelfbook.book, self.book)
         self.assertEqual(shelfbook.user, self.local_user)
 
-    @patch("bookwyrm.suggested_users.SuggestedUsers.get_suggestions")
-    def test_users_view(self, *_):
+    def test_users_view(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.GetStartedUsers.as_view()
         request = self.factory.get("")
         request.user = self.local_user
 
-        result = view(request)
+        with patch("bookwyrm.suggested_users.SuggestedUsers.get_suggestions"):
+            result = view(request)
 
         self.assertIsInstance(result, TemplateResponse)
         validate_html(result.render())
         self.assertEqual(result.status_code, 200)
 
-    def test_users_view_with_query(self, *_):
+    def test_users_view_with_query(self):
         """there are so many views, this just makes sure it LOADS"""
         view = views.GetStartedUsers.as_view()
         request = self.factory.get("?query=rat")

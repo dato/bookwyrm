@@ -17,30 +17,25 @@ from bookwyrm.settings import DOMAIN, BASE_URL
 class User(TestCase):
     @classmethod
     def setUpTestData(cls):
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.user = models.User.objects.create_user(
-                f"mouse@{DOMAIN}",
-                "mouse@mouse.mouse",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                name="hi",
-                summary="a summary",
-                bookwyrm_user=False,
-            )
-            cls.another_user = models.User.objects.create_user(
-                f"nutria@{DOMAIN}",
-                "nutria@nutria.nutria",
-                "nutriaword",
-                local=True,
-                localname="nutria",
-                name="hi",
-                bookwyrm_user=False,
-            )
+        cls.user = models.User.objects.create_user(
+            f"mouse@{DOMAIN}",
+            "mouse@mouse.mouse",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            name="hi",
+            summary="a summary",
+            bookwyrm_user=False,
+        )
+        cls.another_user = models.User.objects.create_user(
+            f"nutria@{DOMAIN}",
+            "nutria@nutria.nutria",
+            "nutriaword",
+            local=True,
+            localname="nutria",
+            name="hi",
+            bookwyrm_user=False,
+        )
         initdb.init_groups()
         initdb.init_permissions()
 
@@ -58,15 +53,14 @@ class User(TestCase):
         self.assertIsNotNone(self.user.key_pair.public_key)
 
     def test_remote_user(self):
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            user = models.User.objects.create_user(
-                "rat",
-                "rat@rat.rat",
-                "ratword",
-                local=False,
-                remote_id="https://example.com/dfjkg",
-                bookwyrm_user=False,
-            )
+        user = models.User.objects.create_user(
+            "rat",
+            "rat@rat.rat",
+            "ratword",
+            local=False,
+            remote_id="https://example.com/dfjkg",
+            bookwyrm_user=False,
+        )
         self.assertEqual(user.username, "rat@example.com")
 
     def test_user_shelves(self):
@@ -122,32 +116,22 @@ class User(TestCase):
 
         site.default_user_auth_group = Group.objects.get(name="editor")
         site.save()
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            user = models.User.objects.create_user(
-                "test2",
-                "test2@bookwyrm.test",
-                localname="test2",
-                **user_attrs,
-            )
+        user = models.User.objects.create_user(
+            "test2",
+            "test2@bookwyrm.test",
+            localname="test2",
+            **user_attrs,
+        )
         self.assertEqual(list(user.groups.all()), [Group.objects.get(name="editor")])
 
         site.default_user_auth_group = None
         site.save()
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            user = models.User.objects.create_user(
-                "test1",
-                "test1@bookwyrm.test",
-                localname="test1",
-                **user_attrs,
-            )
+        user = models.User.objects.create_user(
+            "test1",
+            "test1@bookwyrm.test",
+            localname="test1",
+            **user_attrs,
+        )
         self.assertEqual(len(user.groups.all()), 0)
 
     def test_set_remote_server(self):
@@ -225,8 +209,7 @@ class User(TestCase):
         self.assertIsNone(server.application_type)
         self.assertIsNone(server.application_version)
 
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_delete_user(self, _):
+    def test_delete_user(self):
         """permanently delete a user"""
         self.assertTrue(self.user.is_active)
         self.assertEqual(self.user.name, "hi")
@@ -258,11 +241,7 @@ class User(TestCase):
         self.assertNotEqual(self.user.email, "mouse@mouse.mouse")
         self.assertFalse(self.user.is_active)
 
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    @patch("bookwyrm.activitystreams.remove_status_task.delay")
-    def test_delete_user_erase_statuses(self, *_):
+    def test_delete_user_erase_statuses(self):
         """erase user statuses when user is deleted"""
         status = models.Status.objects.create(user=self.user, content="hello")
         self.assertFalse(status.deleted)
@@ -276,10 +255,7 @@ class User(TestCase):
         self.assertIsNone(status.content)
         self.assertIsNotNone(status.deleted_date)
 
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    @patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_delete_user_erase_statuses_invalid(self, *_):
+    def test_delete_user_erase_statuses_invalid(self):
         """erase user statuses when user is deleted"""
         status = models.Status.objects.create(user=self.user, content="hello")
         self.assertFalse(status.deleted)

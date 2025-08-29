@@ -20,19 +20,14 @@ class Views(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
         cls.work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Test Book",
@@ -86,13 +81,15 @@ class Views(TestCase):
 
         request = self.factory.get("", {"q": "Test Book", "remote": True})
         request.user = self.local_user
-        with patch("bookwyrm.views.search.is_api_request") as is_api:
+        with (
+            patch("bookwyrm.views.search.is_api_request") as is_api,
+            patch("bookwyrm.connectors.connector_manager.search") as remote_search,
+        ):
             is_api.return_value = False
-            with patch("bookwyrm.connectors.connector_manager.search") as remote_search:
-                remote_search.return_value = [
-                    {"results": [mock_result], "connector": connector}
-                ]
-                response = view(request)
+            remote_search.return_value = [
+                {"results": [mock_result], "connector": connector}
+            ]
+            response = view(request)
 
         self.assertIsInstance(response, TemplateResponse)
         validate_html(response.render())
@@ -136,13 +133,15 @@ class Views(TestCase):
         anonymous_user = AnonymousUser
         anonymous_user.is_authenticated = False
         request.user = anonymous_user
-        with patch("bookwyrm.views.search.is_api_request") as is_api:
+        with (
+            patch("bookwyrm.views.search.is_api_request") as is_api,
+            patch("bookwyrm.connectors.connector_manager.search") as remote_search,
+        ):
             is_api.return_value = False
-            with patch("bookwyrm.connectors.connector_manager.search") as remote_search:
-                remote_search.return_value = [
-                    {"results": [mock_result], "connector": connector}
-                ]
-                response = view(request)
+            remote_search.return_value = [
+                {"results": [mock_result], "connector": connector}
+            ]
+            response = view(request)
 
         self.assertIsInstance(response, TemplateResponse)
         validate_html(response.render())
@@ -191,13 +190,7 @@ class Views(TestCase):
 
     def test_search_lists(self):
         """searches remote connectors"""
-        with (
-            patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"),
-            patch("bookwyrm.lists_stream.remove_list_task.delay"),
-        ):
-            booklist = models.List.objects.create(
-                user=self.local_user, name="test list"
-            )
+        booklist = models.List.objects.create(user=self.local_user, name="test list")
         view = views.Search.as_view()
         request = self.factory.get("", {"q": "test", "type": "list"})
         request.user = self.local_user

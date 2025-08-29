@@ -7,9 +7,6 @@ from bookwyrm import models
 from bookwyrm.templatetags import book_display_tags
 
 
-@patch("bookwyrm.activitystreams.add_status_task.delay")
-@patch("bookwyrm.activitystreams.remove_status_task.delay")
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
 class BookDisplayTags(TestCase):
     """lotta different things here"""
 
@@ -30,7 +27,7 @@ class BookDisplayTags(TestCase):
             )
         cls.book = models.Edition.objects.create(title="Test Book")
 
-    def test_get_book_description(self, *_):
+    def test_get_book_description(self):
         """grab it from the edition or the parent"""
         work = models.Work.objects.create(title="Test Work")
         self.book.parent_work = work
@@ -46,7 +43,7 @@ class BookDisplayTags(TestCase):
         self.book.save()
         self.assertEqual(book_display_tags.get_book_description(self.book), "hello")
 
-    def test_get_book_file_links(self, *_):
+    def test_get_book_file_links(self):
         """load approved links"""
         link = models.FileLink.objects.create(
             book=self.book,

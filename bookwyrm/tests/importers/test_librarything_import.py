@@ -1,6 +1,5 @@
 """ testing import """
 import pathlib
-from unittest.mock import patch
 import datetime
 
 from django.test import TestCase
@@ -15,9 +14,6 @@ def make_date(*args):
     return datetime.datetime(*args, tzinfo=datetime.timezone.utc)
 
 
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.activitystreams.add_book_statuses_task.delay")
 class LibrarythingImport(TestCase):
     """importing from librarything tsv"""
 
@@ -37,14 +33,9 @@ class LibrarythingImport(TestCase):
     @classmethod
     def setUpTestData(cls):
         """populate database"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mmai", "mmai@mmai.mmai", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mmai", "mmai@mmai.mmai", "password", local=True
+        )
         models.SiteSettings.objects.create()
         work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
@@ -53,7 +44,7 @@ class LibrarythingImport(TestCase):
             parent_work=work,
         )
 
-    def test_create_job(self, *_):
+    def test_create_job(self):
         """creates the import job entry and checks csv"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "public"
@@ -81,7 +72,7 @@ class LibrarythingImport(TestCase):
         self.assertEqual(import_items[2].index, 2)
         self.assertEqual(import_items[2].data["Book Id"], "5015399")
 
-    def test_create_retry_job(self, *_):
+    def test_create_retry_job(self):
         """trying again with items that didn't import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "unlisted"
@@ -105,7 +96,7 @@ class LibrarythingImport(TestCase):
         self.assertEqual(retry_items[1].index, 1)
         self.assertEqual(retry_items[1].data["Book Id"], "5015319")
 
-    def test_handle_imported_book(self, *_):
+    def test_handle_imported_book(self):
         """librarything import added a book, this adds related connections"""
         shelf = self.local_user.shelf_set.filter(
             identifier=models.Shelf.READ_FINISHED
@@ -119,8 +110,7 @@ class LibrarythingImport(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         shelf.refresh_from_db()
         self.assertEqual(shelf.books.first(), self.book)
@@ -130,16 +120,14 @@ class LibrarythingImport(TestCase):
         self.assertEqual(readthrough.start_date, make_date(2007, 4, 16))
         self.assertEqual(readthrough.finish_date, make_date(2007, 5, 8))
 
-    def test_handle_imported_book_already_shelved(self, *_):
+    def test_handle_imported_book_already_shelved(self):
         """librarything import added a book, this adds related connections"""
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            shelf = self.local_user.shelf_set.filter(
-                identifier=models.Shelf.TO_READ
-            ).first()
-            models.ShelfBook.objects.create(
-                shelf=shelf, user=self.local_user, book=self.book
-            )
-
+        shelf = self.local_user.shelf_set.filter(
+            identifier=models.Shelf.TO_READ
+        ).first()
+        models.ShelfBook.objects.create(
+            shelf=shelf, user=self.local_user, book=self.book
+        )
         import_job = self.importer.create_job(
             self.local_user, self.csv, False, "public"
         )
@@ -147,8 +135,7 @@ class LibrarythingImport(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         shelf.refresh_from_db()
         self.assertEqual(shelf.books.first(), self.book)
@@ -163,8 +150,7 @@ class LibrarythingImport(TestCase):
         self.assertEqual(readthrough.start_date, make_date(2007, 4, 16))
         self.assertEqual(readthrough.finish_date, make_date(2007, 5, 8))
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_handle_imported_book_review(self, *_):
+    def test_handle_imported_book_review(self):
         """librarything review import"""
         import_job = self.importer.create_job(
             self.local_user, self.csv, True, "unlisted"
@@ -173,8 +159,7 @@ class LibrarythingImport(TestCase):
         import_item.book = self.book
         import_item.save()
 
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            handle_imported_book(import_item)
+        handle_imported_book(import_item)
 
         review = models.Review.objects.get(book=self.book, user=self.local_user)
         self.assertEqual(review.content, "chef d'oeuvre")

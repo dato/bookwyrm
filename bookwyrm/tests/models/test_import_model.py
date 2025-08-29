@@ -19,14 +19,9 @@ class ImportJob(TestCase):
     @classmethod
     def setUpTestData(cls):
         """data is from a goodreads export of The Raven Tower"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse", "mouse@mouse.mouse", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse", "mouse@mouse.mouse", "password", local=True
+        )
 
     def setUp(self):
         self.job = models.ImportJob.objects.create(user=self.local_user, mappings={})
@@ -195,15 +190,12 @@ class ImportJob(TestCase):
         )
 
         with (
-            patch("bookwyrm.connectors.abstract_connector.load_more_data.delay"),
             patch(
-                "bookwyrm.connectors.connector_manager.first_search_result"
-            ) as search,
+                "bookwyrm.connectors.connector_manager.first_search_result",
+                return_value=result,
+            ),
+            patch("bookwyrm.connectors.openlibrary.Connector.get_authors_from_data"),
         ):
-            search.return_value = result
-            with patch(
-                "bookwyrm.connectors.openlibrary.Connector.get_authors_from_data"
-            ):
-                book = item.get_book_from_identifier()
+            book = item.get_book_from_identifier()
 
         self.assertEqual(book.title, "Sabriel")

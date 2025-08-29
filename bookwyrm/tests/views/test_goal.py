@@ -1,6 +1,4 @@
 """ test for app action functionality """
-from unittest.mock import patch
-
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
 from django.template.response import TemplateResponse
@@ -18,27 +16,22 @@ class GoalViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.com",
-                "mouseword",
-                local=True,
-                localname="mouse",
-                remote_id="https://example.com/users/mouse",
-            )
-            cls.rat = models.User.objects.create_user(
-                "rat@local.com",
-                "rat@rat.com",
-                "ratword",
-                local=True,
-                localname="rat",
-                remote_id="https://example.com/users/rat",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.com",
+            "mouseword",
+            local=True,
+            localname="mouse",
+            remote_id="https://example.com/users/mouse",
+        )
+        cls.rat = models.User.objects.create_user(
+            "rat@local.com",
+            "rat@rat.com",
+            "ratword",
+            local=True,
+            localname="rat",
+            remote_id="https://example.com/users/rat",
+        )
         cls.book = models.Edition.objects.create(
             title="Example Edition",
             remote_id="https://example.com/book/1",
@@ -114,8 +107,7 @@ class GoalViews(TestCase):
         with self.assertRaises(Http404):
             view(request, self.local_user.localname, self.year)
 
-    @patch("bookwyrm.activitystreams.add_status_task.delay")
-    def test_create_goal(self, _):
+    def test_create_goal(self):
         """create a new goal"""
         view = views.Goal.as_view()
         request = self.factory.post(
@@ -129,8 +121,7 @@ class GoalViews(TestCase):
             },
         )
         request.user = self.local_user
-        with patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"):
-            view(request, self.local_user.localname, self.year)
+        view(request, self.local_user.localname, self.year)
 
         goal = models.AnnualGoal.objects.get()
         self.assertEqual(goal.user, self.local_user)

@@ -1,27 +1,18 @@
 """ testing import """
-from unittest.mock import patch
 from django.test import RequestFactory, TestCase
 
 from bookwyrm import models
 from bookwyrm.views import rss_feed
 
 
-@patch("bookwyrm.models.activitypub_mixin.broadcast_task.apply_async")
-@patch("bookwyrm.activitystreams.ActivityStream.get_activity_stream")
-@patch("bookwyrm.activitystreams.add_status_task.delay")
 class RssFeedView(TestCase):
     """rss feed behaves as expected"""
 
     @classmethod
     def setUpTestData(cls):
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "rss_user", "rss@test.rss", "password", local=True
-            )
+        cls.local_user = models.User.objects.create_user(
+            "rss_user", "rss@test.rss", "password", local=True
+        )
         work = models.Work.objects.create(title="Test Work")
         cls.book = models.Edition.objects.create(
             title="Example Edition",
@@ -34,7 +25,7 @@ class RssFeedView(TestCase):
         """individual test setup"""
         self.factory = RequestFactory()
 
-    def test_rss_empty(self, *_):
+    def test_rss_empty(self):
         """load an rss feed"""
         view = rss_feed.RssFeed()
         request = self.factory.get("/user/rss_user/rss")
@@ -43,7 +34,7 @@ class RssFeedView(TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertIn(b"Status updates from rss_user", result.content)
 
-    def test_rss_comment(self, *_):
+    def test_rss_comment(self):
         """load an rss feed"""
         models.Comment.objects.create(
             content="comment test content",
@@ -57,7 +48,7 @@ class RssFeedView(TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertIn(b"Example Edition", result.content)
 
-    def test_rss_review(self, *_):
+    def test_rss_review(self):
         """load an rss feed"""
         models.Review.objects.create(
             name="Review name",
@@ -72,7 +63,7 @@ class RssFeedView(TestCase):
         result = view(request, username=self.local_user.username)
         self.assertEqual(result.status_code, 200)
 
-    def test_rss_quotation(self, *_):
+    def test_rss_quotation(self):
         """load an rss feed"""
         models.Quotation.objects.create(
             quote="a sickening sense",
@@ -88,7 +79,7 @@ class RssFeedView(TestCase):
 
         self.assertIn(b"a sickening sense", result.content)
 
-    def test_rss_comment_only(self, *_):
+    def test_rss_comment_only(self):
         """load an rss feed"""
         models.Comment.objects.create(
             content="comment test content",
@@ -102,7 +93,7 @@ class RssFeedView(TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertIn(b"Example Edition", result.content)
 
-    def test_rss_review_only(self, *_):
+    def test_rss_review_only(self):
         """load an rss feed"""
         models.Review.objects.create(
             name="Review name",
@@ -117,7 +108,7 @@ class RssFeedView(TestCase):
         result = view(request, username=self.local_user.username)
         self.assertEqual(result.status_code, 200)
 
-    def test_rss_quotation_only(self, *_):
+    def test_rss_quotation_only(self):
         """load an rss feed"""
         models.Quotation.objects.create(
             quote="a sickening sense",
@@ -135,19 +126,16 @@ class RssFeedView(TestCase):
 
     def test_rss_shelf(self, *_):
         """load the rss feed of a shelf"""
-        with patch(
-            "bookwyrm.models.activitypub_mixin.broadcast_task.apply_async"
-        ), patch("bookwyrm.activitystreams.add_book_statuses_task.delay"):
-            # make the shelf
-            shelf = models.Shelf.objects.create(
-                name="Test Shelf", identifier="test-shelf", user=self.local_user
-            )
-            # put the shelf on the book
-            models.ShelfBook.objects.create(
-                book=self.book,
-                shelf=shelf,
-                user=self.local_user,
-            )
+        # make the shelf
+        shelf = models.Shelf.objects.create(
+            name="Test Shelf", identifier="test-shelf", user=self.local_user
+        )
+        # put the shelf on the book
+        models.ShelfBook.objects.create(
+            book=self.book,
+            shelf=shelf,
+            user=self.local_user,
+        )
         view = rss_feed.RssShelfFeed()
         request = self.factory.get("/user/books/test-shelf/rss")
         request.user = self.local_user

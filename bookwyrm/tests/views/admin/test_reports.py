@@ -18,25 +18,20 @@ class ReportViews(TestCase):
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@local.com",
-                "mouse@mouse.mouse",
-                "password",
-                local=True,
-                localname="mouse",
-            )
-            cls.rat = models.User.objects.create_user(
-                "rat@local.com",
-                "rat@mouse.mouse",
-                "password",
-                local=True,
-                localname="rat",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@local.com",
+            "mouse@mouse.mouse",
+            "password",
+            local=True,
+            localname="mouse",
+        )
+        cls.rat = models.User.objects.create_user(
+            "rat@local.com",
+            "rat@mouse.mouse",
+            "password",
+            local=True,
+            localname="rat",
+        )
         initdb.init_groups()
         initdb.init_permissions()
         group = Group.objects.get(name="moderator")
@@ -130,10 +125,7 @@ class ReportViews(TestCase):
             ).exists()
         )
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.activitystreams.populate_stream_task.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_suspend_user(self, *_):
+    def test_suspend_user(self):
         """toggle whether a user is able to log in"""
         self.assertTrue(self.rat.is_active)
         request = self.factory.post("")
@@ -149,9 +141,7 @@ class ReportViews(TestCase):
         self.rat.refresh_from_db()
         self.assertTrue(self.rat.is_active)
 
-    @patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-    @patch("bookwyrm.suggested_users.remove_user_task.delay")
-    def test_delete_user(self, *_):
+    def test_delete_user(self):
         """toggle whether a user is able to log in"""
         self.assertTrue(self.rat.is_active)
         request = self.factory.post("", {"password": "password"})
@@ -170,7 +160,7 @@ class ReportViews(TestCase):
         self.assertFalse(self.rat.is_active)
         self.assertEqual(self.rat.deactivation_reason, "moderator_deletion")
 
-    def test_delete_user_error(self, *_):
+    def test_delete_user_error(self):
         """toggle whether a user is able to log in"""
         self.assertTrue(self.rat.is_active)
         request = self.factory.post("", {"password": "wrong password"})

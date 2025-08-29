@@ -38,24 +38,19 @@ class Signature(TestCase):
     @classmethod
     def setUpTestData(cls):
         """create users and test data"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.mouse = models.User.objects.create_user(
-                f"mouse@{DOMAIN}",
-                "mouse@example.com",
-                "",
-                local=True,
-                localname="mouse",
-            )
-            cls.rat = models.User.objects.create_user(
-                f"rat@{DOMAIN}", "rat@example.com", "", local=True, localname="rat"
-            )
-            cls.cat = models.User.objects.create_user(
-                f"cat@{DOMAIN}", "cat@example.com", "", local=True, localname="cat"
-            )
+        cls.mouse = models.User.objects.create_user(
+            f"mouse@{DOMAIN}",
+            "mouse@example.com",
+            "",
+            local=True,
+            localname="mouse",
+        )
+        cls.rat = models.User.objects.create_user(
+            f"rat@{DOMAIN}", "rat@example.com", "", local=True, localname="rat"
+        )
+        cls.cat = models.User.objects.create_user(
+            f"cat@{DOMAIN}", "cat@example.com", "", local=True, localname="cat"
+        )
         models.SiteSettings.objects.create()
 
     def setUp(self):
@@ -91,11 +86,7 @@ class Signature(TestCase):
         signature = make_signature(
             "post", signer or sender, self.rat.inbox, now, digest=digest
         )
-        with (
-            patch("bookwyrm.views.inbox.activity_task.apply_async"),
-            patch("bookwyrm.models.user.set_remote_server.delay"),
-        ):
-            return self.send(signature, now, send_data or data, digest)
+        return self.send(signature, now, send_data or data, digest)
 
     def test_correct_signature(self):
         """this one should just work"""
@@ -129,13 +120,12 @@ class Signature(TestCase):
             status=200,
         )
 
-        with patch("bookwyrm.models.user.get_remote_reviews.delay"):
-            with patch(
-                "bookwyrm.models.relationship.UserFollowRequest.accept"
-            ) as accept_mock:
-                response = self.send_test_request(sender=self.fake_remote)
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(accept_mock.called)
+        with patch(
+            "bookwyrm.models.relationship.UserFollowRequest.accept"
+        ) as accept_mock:
+            response = self.send_test_request(sender=self.fake_remote)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(accept_mock.called)
 
     @responses.activate
     def test_key_needs_refresh(self):
@@ -157,34 +147,33 @@ class Signature(TestCase):
         data["publicKey"]["publicKeyPem"] = key_pair.public_key
         responses.add(responses.GET, self.fake_remote.remote_id, json=data, status=200)
 
-        with patch("bookwyrm.models.user.get_remote_reviews.delay"):
-            # Key correct:
-            with patch(
-                "bookwyrm.models.relationship.UserFollowRequest.accept"
-            ) as accept_mock:
-                response = self.send_test_request(sender=self.fake_remote)
-            self.assertEqual(response.status_code, 200)  # BUG this is 401
-            self.assertTrue(accept_mock.called)
-
-            # Old key is cached, so still works:
-            with patch(
-                "bookwyrm.models.relationship.UserFollowRequest.accept"
-            ) as accept_mock:
-                response = self.send_test_request(sender=self.fake_remote)
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(accept_mock.called)
-
-            # Try with new key:
-            with patch(
-                "bookwyrm.models.relationship.UserFollowRequest.accept"
-            ) as accept_mock:
-                response = self.send_test_request(sender=new_sender)
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(accept_mock.called)
-
-            # Now the old key will fail:
+        # Key correct:
+        with patch(
+            "bookwyrm.models.relationship.UserFollowRequest.accept"
+        ) as accept_mock:
             response = self.send_test_request(sender=self.fake_remote)
-            self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 200)  # BUG this is 401
+        self.assertTrue(accept_mock.called)
+
+        # Old key is cached, so still works:
+        with patch(
+            "bookwyrm.models.relationship.UserFollowRequest.accept"
+        ) as accept_mock:
+            response = self.send_test_request(sender=self.fake_remote)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(accept_mock.called)
+
+        # Try with new key:
+        with patch(
+            "bookwyrm.models.relationship.UserFollowRequest.accept"
+        ) as accept_mock:
+            response = self.send_test_request(sender=new_sender)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(accept_mock.called)
+
+        # Now the old key will fail:
+        response = self.send_test_request(sender=self.fake_remote)
+        self.assertEqual(response.status_code, 401)
 
     @responses.activate
     def test_nonexistent_signer(self):
