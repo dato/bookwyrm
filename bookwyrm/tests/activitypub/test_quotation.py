@@ -2,7 +2,6 @@
 
 import json
 import pathlib
-from unittest.mock import patch
 
 from django.test import TestCase
 from bookwyrm import activitypub, models
@@ -14,16 +13,15 @@ class Quotation(TestCase):
     @classmethod
     def setUpTestData(cls):
         """model objects we'll need"""
-        with patch("bookwyrm.models.user.set_remote_server.delay"):
-            cls.user = models.User.objects.create_user(
-                "mouse",
-                "mouse@mouse.mouse",
-                "mouseword",
-                local=False,
-                inbox="https://example.com/user/mouse/inbox",
-                outbox="https://example.com/user/mouse/outbox",
-                remote_id="https://example.com/user/mouse",
-            )
+        cls.user = models.User.objects.create_user(
+            "mouse",
+            "mouse@mouse.mouse",
+            "mouseword",
+            local=False,
+            inbox="https://example.com/user/mouse/inbox",
+            outbox="https://example.com/user/mouse/outbox",
+            remote_id="https://example.com/user/mouse",
+        )
         cls.book = models.Edition.objects.create(
             title="Example Edition",
             remote_id="https://example.com/book/1",

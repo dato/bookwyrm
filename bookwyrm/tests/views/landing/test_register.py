@@ -14,27 +14,19 @@ from bookwyrm.settings import DOMAIN
 from bookwyrm.tests.validate_html import validate_html
 
 
-@patch("bookwyrm.suggested_users.rerank_suggestions_task.delay")
-@patch("bookwyrm.activitystreams.populate_stream_task.delay")
-@patch("bookwyrm.lists_stream.populate_lists_task.delay")
 class RegisterViews(TestCase):
     """login and password management"""
 
     @classmethod
     def setUpTestData(cls):
         """we need basic test data and mocks"""
-        with (
-            patch("bookwyrm.suggested_users.rerank_suggestions_task.delay"),
-            patch("bookwyrm.activitystreams.populate_stream_task.delay"),
-            patch("bookwyrm.lists_stream.populate_lists_task.delay"),
-        ):
-            cls.local_user = models.User.objects.create_user(
-                "mouse@your.domain.here",
-                "mouse@mouse.com",
-                "password",
-                local=True,
-                localname="mouse",
-            )
+        cls.local_user = models.User.objects.create_user(
+            "mouse@your.domain.here",
+            "mouse@mouse.com",
+            "password",
+            local=True,
+            localname="mouse",
+        )
         cls.settings = models.SiteSettings.get()
         cls.settings.require_confirm_email = False
         cls.settings.allow_registration = True
@@ -46,14 +38,14 @@ class RegisterViews(TestCase):
         self.anonymous_user = AnonymousUser
         self.anonymous_user.is_authenticated = False
 
-    def test_get_redirect(self, *_):
+    def test_get_redirect(self):
         """there's no dedicated registration page"""
         view = views.Register.as_view()
         request = self.factory.get("register/")
         response = view(request)
         self.assertEqual(response.status_code, 302)
 
-    def test_register(self, *_):
+    def test_register(self):
         """create a user"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -76,8 +68,7 @@ class RegisterViews(TestCase):
         self.assertEqual(nutria.local, True)
         self.assertEqual(nutria.preferred_timezone, "Europe/Berlin")
 
-    @patch("bookwyrm.emailing.send_email.delay")
-    def test_register_email_confirm(self, *_):
+    def test_register_email_confirm(self):
         """create a user"""
         self.settings.require_confirm_email = True
         self.settings.save()
@@ -103,7 +94,7 @@ class RegisterViews(TestCase):
         self.assertEqual(nutria.deactivation_reason, "pending")
         self.assertIsNotNone(nutria.confirmation_code)
 
-    def test_register_trailing_space(self, *_):
+    def test_register_trailing_space(self):
         """django handles this so weirdly"""
         view = views.Register.as_view()
         request = self.factory.post(
@@ -119,7 +110,7 @@ class RegisterViews(TestCase):
         self.assertEqual(nutria.localname, "nutria")
         self.assertEqual(nutria.local, True)
 
-    def test_register_invalid_email(self, *_):
+    def test_register_invalid_email(self):
         """gotta have an email"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -130,7 +121,7 @@ class RegisterViews(TestCase):
         self.assertEqual(models.User.objects.count(), 1)
         validate_html(response.render())
 
-    def test_register_invalid_password(self, *_):
+    def test_register_invalid_password(self):
         """gotta have an email"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -141,7 +132,7 @@ class RegisterViews(TestCase):
         self.assertEqual(models.User.objects.count(), 1)
         validate_html(response.render())
 
-    def test_register_error_and_invite(self, *_):
+    def test_register_error_and_invite(self):
         """redirect to the invite page"""
         view = views.Register.as_view()
         self.settings.allow_registration = False
@@ -165,7 +156,7 @@ class RegisterViews(TestCase):
         response = view(request)
         validate_html(response.render())
 
-    def test_register_username_in_use(self, *_):
+    def test_register_username_in_use(self):
         """that username is taken"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -177,7 +168,7 @@ class RegisterViews(TestCase):
         self.assertEqual(models.User.objects.count(), 1)
         validate_html(response.render())
 
-    def test_register_invalid_username(self, *_):
+    def test_register_invalid_username(self):
         """gotta have an email"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -205,7 +196,7 @@ class RegisterViews(TestCase):
         self.assertEqual(models.User.objects.count(), 1)
         validate_html(response.render())
 
-    def test_register_default_preferred_timezone(self, *_):
+    def test_register_default_preferred_timezone(self):
         """invalid preferred timezone strings should just default to UTC"""
         view = views.Register.as_view()
         self.assertEqual(models.User.objects.count(), 1)
@@ -257,7 +248,7 @@ class RegisterViews(TestCase):
         nutria = models.User.objects.last()
         self.assertEqual(nutria.preferred_timezone, "UTC")
 
-    def test_register_closed_instance(self, *_):
+    def test_register_closed_instance(self):
         """you can't just register"""
         view = views.Register.as_view()
         self.settings.allow_registration = False
@@ -269,7 +260,7 @@ class RegisterViews(TestCase):
         with self.assertRaises(PermissionDenied):
             view(request)
 
-    def test_register_blocked_domain(self, *_):
+    def test_register_blocked_domain(self):
         """you can't register with a blocked domain"""
         view = views.Register.as_view()
         models.EmailBlocklist.objects.create(domain="gmail.com")
@@ -293,7 +284,7 @@ class RegisterViews(TestCase):
         self.assertEqual(result.status_code, 302)
         self.assertTrue(models.User.objects.filter(email="aa@bleep.com").exists())
 
-    def test_register_invite(self, *_):
+    def test_register_invite(self):
         """you can't just register"""
         view = views.Register.as_view()
         self.settings.allow_registration = False
@@ -346,7 +337,7 @@ class RegisterViews(TestCase):
             response = view(request)
         self.assertEqual(models.User.objects.count(), 2)
 
-    def test_confirm_email_code_get(self, *_):
+    def test_confirm_email_code_get(self):
         """there are so many views, this just makes sure it LOADS"""
         self.settings.require_confirm_email = True
         self.settings.save()
@@ -381,7 +372,7 @@ class RegisterViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_confirm_email_code_get_invalid_code(self, *_):
+    def test_confirm_email_code_get_invalid_code(self):
         """there are so many views, this just makes sure it LOADS"""
         self.settings.require_confirm_email = True
         self.settings.save()
@@ -404,7 +395,7 @@ class RegisterViews(TestCase):
         self.assertFalse(self.local_user.is_active)
         self.assertEqual(self.local_user.deactivation_reason, "pending")
 
-    def test_confirm_email_get(self, *_):
+    def test_confirm_email_get(self):
         """there are so many views, this just makes sure it LOADS"""
         self.settings.require_confirm_email = True
         self.settings.save()
@@ -423,7 +414,7 @@ class RegisterViews(TestCase):
         self.assertEqual(result.url, "/")
         self.assertEqual(result.status_code, 302)
 
-    def test_confirm_email_post(self, *_):
+    def test_confirm_email_post(self):
         """send the email"""
         self.settings.require_confirm_email = True
         self.settings.save()
@@ -437,14 +428,14 @@ class RegisterViews(TestCase):
         result = view(request)
         validate_html(result.render())
 
-    def test_resend_link_get(self, *_):
+    def test_resend_link_get(self):
         """try again"""
         request = self.factory.get("")
         request.user = self.anonymous_user
         result = views.ResendConfirmEmail.as_view()(request)
         validate_html(result.render())
 
-    def test_resend_link_post(self, *_):
+    def test_resend_link_post(self):
         """try again"""
         request = self.factory.post("", {"email": "mouse@mouse.com"})
         request.user = self.anonymous_user
